@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV 数据清洗工具</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- ========== Header ========== -->
+  <header id="header">
+    <div class="header-left">
+      <h1>CSV 数据清洗工具</h1>
+      <span class="subtitle">拖入 CSV -> 智能分析 -> 规则清洗 -> 导出</span>
+    </div>
+    <div class="header-right">
+      <button id="btnUndo" title="撤销 (Ctrl+Z)" disabled>撤销</button>
+      <button id="btnRedo" title="重做 (Ctrl+Y)" disabled>重做</button>
+      <span class="sep"></span>
+      <button id="btnSaveRules" title="保存规则配置">保存规则</button>
+      <button id="btnLoadRules" title="加载规则配置">加载规则</button>
+      <span class="sep"></span>
+      <button id="btnExportCSV" title="导出清洗后 CSV" disabled>导出 CSV</button>
+      <button id="btnExportReport" title="导出错误报告" disabled>错误报告</button>
+      <button id="btnExportRules" title="导出规则 JSON">规则 JSON</button>
+    </div>
+  </header>
+
+  <!-- ========== Main Layout ========== -->
+  <div id="mainLayout">
+    <!-- Left Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-section">
+        <h3>数据集</h3>
+        <div id="datasetList" class="dataset-list"></div>
+        <div id="dropHint" class="drop-hint">
+          <p>拖入 CSV 文件<br>或点击此处选择</p>
+          <input type="file" id="fileInput" accept=".csv,.tsv,.txt" multiple hidden>
+        </div>
+      </div>
+      <div class="sidebar-section" id="profileSummary" style="display:none">
+        <h3>数据概况</h3>
+        <div id="profileContent"></div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="content">
+      <!-- Welcome screen -->
+      <div id="welcomeScreen" class="welcome">
+        <div class="welcome-inner">
+          <div class="welcome-icon">&#9636;</div>
+          <h2>拖入 CSV 文件开始</h2>
+          <p>支持多个 CSV 文件同时导入，自动推断字段类型</p>
+          <p>识别日期、金额、枚举、主键、空值、重复行和脏数据</p>
+          <div class="welcome-features">
+            <div class="feature">智能分析</div>
+            <div class="feature">规则清洗</div>
+            <div class="feature">撤销重做</div>
+            <div class="feature">导出结果</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data view -->
+      <div id="dataView" style="display:none">
+        <div id="tabBar" class="tab-bar">
+          <button class="tab active" data-tab="profile">数据画像</button>
+          <button class="tab" data-tab="data">数据预览</button>
+          <button class="tab" data-tab="rules">清洗规则</button>
+          <button class="tab" data-tab="results">清洗结果</button>
+        </div>
+
+        <!-- Profile -->
+        <div id="tabProfile" class="tab-content active">
+          <div class="profile-header">
+            <div class="quality-score">
+              <canvas id="qualityCanvas" width="120" height="120"></canvas>
+              <div class="quality-label">质量评分</div>
+            </div>
+            <div class="quality-breakdown" id="qualityBreakdown"></div>
+          </div>
+          <div id="columnProfiles" class="column-profiles"></div>
+        </div>
+
+        <!-- Data Preview -->
+        <div id="tabData" class="tab-content" style="display:none">
+          <div class="data-toolbar">
+            <span id="dataInfo"></span>
+            <label><input type="checkbox" id="showDirty"> 高亮脏数据</label>
+            <label><input type="checkbox" id="showNulls"> 高亮空值</label>
+            <label><input type="checkbox" id="showDupRows"> 标记重复行</label>
+          </div>
+          <div id="gridContainer" class="grid-container">
+            <div id="gridHeader" class="grid-header"></div>
+            <div id="gridBody" class="grid-body"></div>
+          </div>
+        </div>
+
+        <!-- Rules -->
+        <div id="tabRules" class="tab-content" style="display:none">
+          <div class="rules-toolbar">
+            <select id="ruleTypeSelect">
+              <option value="">-- 添加清洗规则 --</option>
+              <option value="dedup">去重</option>
+              <option value="nullFill">空值填充</option>
+              <option value="trim">去除空白</option>
+              <option value="fieldSplit">字段拆分</option>
+              <option value="dateNormalize">日期标准化</option>
+              <option value="amountConvert">金额单位转换</option>
+              <option value="enumMap">枚举映射</option>
+              <option value="crossValidate">跨表关联校验</option>
+              <option value="rename">字段重命名</option>
+            </select>
+            <button id="btnAddRule">+ 添加</button>
+            <button id="btnExecuteAll" class="btn-primary">执行所有规则</button>
+            <button id="btnClearRules">清空规则</button>
+          </div>
+          <div id="rulesList" class="rules-list"></div>
+        </div>
+
+        <!-- Results -->
+        <div id="tabResults" class="tab-content" style="display:none">
+          <div id="resultsContent" class="results-content">
+            <p class="placeholder">执行清洗规则后查看结果</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Drop Overlay -->
+  <div id="dropOverlay" class="drop-overlay">
+    <div class="drop-overlay-inner">
+      <p>释放以导入 CSV 文件</p>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display:none">
+    <div class="spinner"></div>
+    <p id="loadingText">处理中...</p>
+    <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Modal -->
+  <div id="ruleModal" class="modal" style="display:none">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">配置规则</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+      <div class="modal-footer">
+        <button id="modalCancel" class="btn-secondary">取消</button>
+        <button id="modalConfirm" class="btn-primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="rulesFileInput" accept=".json" hidden>
+
+  <script src="js/utils.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/worker-bridge.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/rules-panel.js"></script>
+  <script src="js/results.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
