@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV 数据清洗工具</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ========== Notification ========== -->
+<div id="notification" class="notification"></div>
+
+<!-- ========== Progress bar ========== -->
+<div id="progressBar" class="progress-bar" style="display:none">
+  <div class="progress-spinner"></div>
+  <span id="progressText">处理中...</span>
+</div>
+
+<!-- ========== Header ========== -->
+<header class="header">
+  <h1>CSV 数据清洗工具</h1>
+  <div class="toolbar">
+    <button id="undoBtn" class="btn" disabled>撤销 (0)</button>
+    <button id="redoBtn" class="btn" disabled>重做 (0)</button>
+    <span class="separator"></span>
+    <button id="exportCSVBtn" class="btn">导出 CSV</button>
+    <button id="exportErrorBtn" class="btn">导出错误报告</button>
+    <button id="exportRulesBtn" class="btn">导出规则 JSON</button>
+    <button id="importRulesBtn" class="btn">导入规则</button>
+    <input type="file" id="importRulesFile" accept=".json" hidden>
+  </div>
+</header>
+
+<!-- ========== Main layout ========== -->
+<main class="main">
+
+  <!-- Left panel -->
+  <section class="panel panel-left">
+
+    <!-- Drop zone -->
+    <div id="dropZone" class="drop-zone">
+      <div class="drop-icon">&#128196;</div>
+      <p>拖拽 CSV 文件到此处<br>或点击选择文件</p>
+      <input type="file" id="fileInput" accept=".csv,.tsv,.txt" multiple hidden>
+    </div>
+
+    <!-- File tabs -->
+    <div id="fileList" class="file-list"></div>
+
+    <!-- Column info -->
+    <div class="section">
+      <h3 class="section-title">字段信息</h3>
+      <div id="columnInfo" class="scroll-box"></div>
+    </div>
+
+    <!-- Issues -->
+    <div class="section">
+      <h3 class="section-title">数据问题</h3>
+      <div id="issuesSummary"></div>
+    </div>
+
+    <!-- Quality score -->
+    <div class="section">
+      <h3 class="section-title">质量评分</h3>
+      <canvas id="qualityCanvas" class="quality-canvas"></canvas>
+      <div id="qualityDetails"></div>
+    </div>
+  </section>
+
+  <!-- Center panel: data preview -->
+  <section class="panel panel-center">
+    <div class="panel-header">
+      <h3>数据预览</h3>
+      <span class="meta">行: <span id="rowCount">0</span> | 列: <span id="colCount">0</span></span>
+      <div class="pagination">
+        <button id="prevPage" class="btn btn-sm" disabled>&laquo; 上一页</button>
+        <span id="pageInfo">0 / 0</span>
+        <button id="nextPage" class="btn btn-sm" disabled>下一页 &raquo;</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="dataTable" class="data-table">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Diff / execution result panel -->
+    <div id="diffPanel" class="diff-panel" style="display:none">
+      <div id="diffContent"></div>
+    </div>
+  </section>
+
+  <!-- Right panel: rules -->
+  <section class="panel panel-right">
+    <div class="section">
+      <h3 class="section-title">清洗规则</h3>
+      <div class="add-rule-bar">
+        <select id="addRuleType" class="rc-select">
+          <option value="dedup">去重</option>
+          <option value="fillNull">空值填充</option>
+          <option value="splitField">字段拆分</option>
+          <option value="dateStandardize">日期标准化</option>
+          <option value="amountConvert">金额单位转换</option>
+          <option value="enumMap">枚举映射</option>
+          <option value="rename">字段重命名</option>
+        </select>
+        <button id="addRuleBtn" class="btn btn-primary">添加规则</button>
+      </div>
+      <div id="ruleList" class="rule-list">
+        <div class="empty-hint">暂无规则，点击"添加规则"开始配置</div>
+      </div>
+      <button id="executeBtn" class="btn btn-execute">执行清洗</button>
+    </div>
+
+    <!-- Rule persistence -->
+    <div class="section">
+      <h3 class="section-title">规则保存与复用</h3>
+      <div class="save-bar">
+        <input type="text" id="ruleSetName" class="rc-input" placeholder="规则集名称">
+        <button id="saveRuleSetBtn" class="btn btn-primary">保存</button>
+      </div>
+      <div id="savedRuleSets" class="saved-rs-list">
+        <div class="empty-hint">暂无已保存的规则集</div>
+      </div>
+    </div>
+
+    <!-- Cross-table validation -->
+    <div class="section">
+      <h3 class="section-title">跨表关联校验</h3>
+      <div class="cross-form">
+        <label>源文件</label>
+        <select id="crossSource" class="rc-select"><option value="">选择文件</option></select>
+        <label>源字段</label>
+        <select id="crossSourceCol" class="rc-select"><option value="">选择字段</option></select>
+        <label>目标文件</label>
+        <select id="crossTarget" class="rc-select"><option value="">选择文件</option></select>
+        <label>目标字段</label>
+        <select id="crossTargetCol" class="rc-select"><option value="">选择字段</option></select>
+        <button id="crossValidateBtn" class="btn">校验</button>
+      </div>
+      <div id="crossResult"></div>
+    </div>
+
+    <div id="ruleConfigPanel"></div>
+  </section>
+
+</main>
+
+<script src="js/db.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    UI.init();
+    App.init();
+  });
+</script>
+</body>
+</html>
