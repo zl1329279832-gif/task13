@@ -1,5 +1,13 @@
 /* utils.js — Shared utilities */
 
+/* CancelledError — used by WorkerBridge to signal stale/cancelled tasks */
+class CancelledError extends Error {
+  constructor(message) {
+    super(message || 'Task cancelled');
+    this.name = 'CancelledError';
+  }
+}
+
 function toast(msg, type, duration) {
   type = type || '';
   duration = duration || 3000;
@@ -76,6 +84,59 @@ function readFileAsText(file) {
     reader.onerror = () => reject(new Error('Failed to read file: ' + file.name));
     reader.readAsText(file, 'UTF-8');
   });
+}
+
+const READ_CHUNK_SIZE = 1048576; // 1MB
+
+function readFileAsTextChunked(file, options) {
+  options = options || {};
+  const signal = options.signal || null;
+  const onProgress = options.onProgress || null;
+
+  // Small files: skip chunking overhead
+  if (file.size < 5 * 1048576) {
+    return new Promise((resolve, reject) => {
+      if (signal && signal.aborted) {
+        return reject(new DOMException('Aborted', 'AbortError'));
+      }
+      const reader = new FileReader();
+      const onAbort = () => { reader.abort(); reject(new DOMException('Aborted', 'AbortError')); };
+      if (signal) signal.addEventListener('abort', onAbort, { once: true });
+      reader.onload = () => {
+        if (signal) signal.removeEventListener('abort', onAbort);
+        if (onProgress) onProgress(1);
+        resolve(reader.result);
+      };
+      reader.onerror = () => {
+        if (signal) signal.removeEventListener('abort', onAbort);
+        reject(new Error('Failed to read file: ' + file.name));
+      };
+      reader.readAsText(file, 'UTF-8');
+    });
+  }
+
+  // Large files: chunked reading with progress and abort support
+  return (async () => {
+    const chunks = [];
+    let offset = 0;
+    while (offset < file.size) {
+      if (signal && signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      const end = Math.min(offset + READ_CHUNK_SIZE, file.size);
+      const blob = file.slice(offset, end);
+      const chunkText = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Failed to read chunk at offset ' + offset));
+        reader.readAsText(blob, 'UTF-8');
+      });
+      chunks.push(chunkText);
+      offset = end;
+      if (onProgress) onProgress(offset / file.size);
+    }
+    return chunks.join('');
+  })();
 }
 
 function debounce(fn, ms) {

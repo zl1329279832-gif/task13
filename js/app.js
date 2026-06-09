@@ -11,10 +11,14 @@ class App {
     this.rulesPanel = new RulesPanel(this);
     this.resultsView = new ResultsView(this);
 
-    /** Undo/redo history */
-    this.history = [];
-    this.historyIdx = -1;
+    /** Undo/redo history — per-dataset stacks */
+    this.historyStacks = new Map();
     this.maxHistory = 50;
+
+    /** Concurrency guards for import and rule execution */
+    this._importEpoch = 0;
+    this._execEpoch = 0;
+    this._abortController = null;
 
     this._initUI();
     this._initDragDrop();
@@ -89,14 +93,33 @@ class App {
     );
     if (csvFiles.length === 0) { toast('未找到 CSV 文件', 'warning'); return; }
 
+    // Cancel any previous import in progress
+    if (this._abortController) this._abortController.abort();
+    this._abortController = new AbortController();
+    const signal = this._abortController.signal;
+
+    this._importEpoch++;
+    const myEpoch = this._importEpoch;
+    this.worker.cancelAll();
+
     showLoading(`正在解析 ${csvFiles.length} 个文件...`, 0);
 
     for (let i = 0; i < csvFiles.length; i++) {
       const file = csvFiles[i];
       try {
         showLoading(`解析 ${file.name} (${i+1}/${csvFiles.length})...`, i / csvFiles.length);
-        const text = await readFileAsText(file);
+        const text = await readFileAsTextChunked(file, {
+          signal,
+          onProgress: (p) => showLoading(`读取 ${file.name}...`, (i + p) / csvFiles.length),
+        });
+
+        // Check if a newer import has started
+        if (myEpoch !== this._importEpoch) return;
+
         const result = await this.worker.parseCSV(text, {});
+
+        // Re-check after worker response
+        if (myEpoch !== this._importEpoch) return;
 
         const name = file.name.replace(/\.(csv|tsv|txt)$/i, '');
         let uniqueName = name;
@@ -115,6 +138,7 @@ class App {
 
         toast(`${uniqueName}: ${fmtNum(result.rows.length)} 行 x ${result.headers.length} 列`, 'success');
       } catch (err) {
+        if (err instanceof CancelledError || err.name === 'AbortError') return;
         toast(`${file.name}: ${err.message}`, 'error');
       }
     }
@@ -146,12 +170,17 @@ class App {
 
   removeDataset(name) {
     this.datasets.delete(name);
+    this.historyStacks.delete(name);
     if (this.activeDatasetName === name) {
       this.activeDatasetName = this.datasets.size > 0 ? this.datasets.keys().next().value : null;
     }
     this._renderDatasetList();
-    if (this.activeDatasetName) this._renderActiveDataset();
-    else this._showWelcome();
+    if (this.activeDatasetName) {
+      this._renderActiveDataset();
+      this._updateUndoRedoButtons();
+    } else {
+      this._showWelcome();
+    }
   }
 
   _renderDatasetList() {
@@ -180,7 +209,7 @@ class App {
         this.activeDatasetName = item.dataset.name;
         this._renderDatasetList();
         this._renderActiveDataset();
-        this._pushHistory();
+        this._updateUndoRedoButtons();
       }
     };
   }
@@ -329,6 +358,10 @@ class App {
     const rules = this.rulesPanel.getRules().filter(r => r.enabled !== false);
     if (rules.length === 0) { toast('请先添加清洗规则', 'warning'); return; }
 
+    this._execEpoch++;
+    const myEpoch = this._execEpoch;
+    this.worker.cancelAll();
+
     showLoading('执行清洗规则...', 0);
     const profileBefore = deepClone(ds.profile);
 
@@ -336,11 +369,12 @@ class App {
       const allDatasets = this.getAllDatasetsForWorker();
       const result = await this.worker.executeRules(ds.headers.slice(), ds.rows.map(r => r.slice()), rules, allDatasets);
 
+      // Discard if a newer execution has started
+      if (myEpoch !== this._execEpoch) { hideLoading(); return; }
+
       ds.headers = result.headers;
       ds.rows = result.rows;
-
-      const newProfile = await this.worker.profile(result.headers, result.rows);
-      ds.profile = newProfile.profile;
+      ds.profile = result.profileAfter;
 
       hideLoading();
 
@@ -352,52 +386,66 @@ class App {
       toast(`清洗完成! 质量 ${profileBefore.quality} -> ${ds.profile.quality}`, ds.profile.quality >= profileBefore.quality ? 'success' : 'warning');
     } catch (err) {
       hideLoading();
+      if (err instanceof CancelledError) return;
       toast('执行失败: ' + err.message, 'error');
     }
   }
 
   /* ============================================================
-     Undo / Redo
+     Undo / Redo — per-dataset isolated stacks
      ============================================================ */
+  _getHistoryForDataset(name) {
+    if (!name) return null;
+    if (!this.historyStacks.has(name)) {
+      this.historyStacks.set(name, { stack: [], idx: -1 });
+    }
+    return this.historyStacks.get(name);
+  }
+
   _pushHistory() {
     const ds = this.getActiveDataset();
     if (!ds) return;
 
-    if (this.historyIdx < this.history.length - 1) {
-      this.history = this.history.slice(0, this.historyIdx + 1);
+    const hist = this._getHistoryForDataset(this.activeDatasetName);
+    if (!hist) return;
+
+    if (hist.idx < hist.stack.length - 1) {
+      hist.stack = hist.stack.slice(0, hist.idx + 1);
     }
 
-    this.history.push({
-      datasetName: this.activeDatasetName,
+    hist.stack.push({
       headers: ds.headers.slice(),
       rows: ds.rows.map(r => r.slice()),
       profile: deepClone(ds.profile),
       rulesSnapshot: deepClone(this.rulesPanel.getRules()),
     });
 
-    if (this.history.length > this.maxHistory) this.history.shift();
-    this.historyIdx = this.history.length - 1;
+    if (hist.stack.length > this.maxHistory) hist.stack.shift();
+    hist.idx = hist.stack.length - 1;
     this._updateUndoRedoButtons();
   }
 
   undo() {
-    if (this.historyIdx <= 0) return;
-    this.historyIdx--;
+    const hist = this._getHistoryForDataset(this.activeDatasetName);
+    if (!hist || hist.idx <= 0) return;
+    hist.idx--;
     this._restoreHistory();
   }
 
   redo() {
-    if (this.historyIdx >= this.history.length - 1) return;
-    this.historyIdx++;
+    const hist = this._getHistoryForDataset(this.activeDatasetName);
+    if (!hist || hist.idx >= hist.stack.length - 1) return;
+    hist.idx++;
     this._restoreHistory();
   }
 
   _restoreHistory() {
-    const snap = this.history[this.historyIdx];
+    const hist = this._getHistoryForDataset(this.activeDatasetName);
+    if (!hist) return;
+    const snap = hist.stack[hist.idx];
     if (!snap) return;
 
-    this.activeDatasetName = snap.datasetName;
-    const ds = this.datasets.get(snap.datasetName);
+    const ds = this.datasets.get(this.activeDatasetName);
     if (ds) {
       ds.headers = snap.headers.slice();
       ds.rows = snap.rows.map(r => r.slice());
@@ -411,8 +459,9 @@ class App {
   }
 
   _updateUndoRedoButtons() {
-    document.getElementById('btnUndo').disabled = this.historyIdx <= 0;
-    document.getElementById('btnRedo').disabled = this.historyIdx >= this.history.length - 1;
+    const hist = this._getHistoryForDataset(this.activeDatasetName);
+    document.getElementById('btnUndo').disabled = !hist || hist.idx <= 0;
+    document.getElementById('btnRedo').disabled = !hist || hist.idx >= hist.stack.length - 1;
   }
 
   /* ============================================================
@@ -453,6 +502,7 @@ class App {
         this.switchTab('rules');
       }
     } catch (err) {
+      toast('数据库读取失败，请从文件导入: ' + err.message, 'warning');
       document.getElementById('rulesFileInput').click();
     }
   }
@@ -508,6 +558,9 @@ class App {
 
 /* Boot */
 (async function init() {
-  try { await store.open(); } catch (e) { console.warn('IndexedDB init failed:', e); }
+  try { await store.open(); } catch (e) {
+    console.warn('IndexedDB init failed:', e);
+    toast('本地存储不可用，规则将无法保存', 'warning', 5000);
+  }
   window.app = new App();
 })();

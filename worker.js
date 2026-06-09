@@ -41,6 +41,8 @@ self.onmessage = function (e) {
 /* ============================================================
    CSV PARSER — handles quoted fields, embedded commas, newlines
    ============================================================ */
+const MAX_QUOTED_FIELD = 131072; // 128KB safety valve for unclosed quotes
+
 function parseCSV(text, config) {
   config = config || {};
   const delimiter = config.delimiter || detectDelimiter(text);
@@ -54,20 +56,38 @@ function parseCSV(text, config) {
     if (i >= len) return '';
     if (text[i] === '"' || text[i] === '\u201c' || text[i] === '\u201d') {
       const quote = text[i];
+      // Pair smart quotes: \u201c <-> \u201d; ASCII " matches itself
+      const closeQuote = quote === '\u201c' ? '\u201d'
+                       : quote === '\u201d' ? '\u201c'
+                       : quote;
+      const fieldStart = i;
       i++;
       let field = '';
       while (i < len) {
-        if (text[i] === quote) {
-          if (i + 1 < len && (text[i + 1] === quote || text[i + 1] === '\u201c' || text[i + 1] === '\u201d')) {
+        if (text[i] === quote || text[i] === closeQuote) {
+          if (i + 1 < len && (text[i + 1] === quote || text[i + 1] === closeQuote)) {
+            // Escaped quote (doubled)
             field += quote === '"' ? '"' : text[i];
             i += 2;
           } else {
+            // End of quoted field
             i++;
             break;
           }
         } else {
           field += text[i];
           i++;
+        }
+        // Safety valve: if quoted field exceeds MAX_QUOTED_FIELD, treat as unclosed
+        if (field.length > MAX_QUOTED_FIELD) {
+          // Rewind to just after the opening quote and re-parse as unquoted
+          i = fieldStart + 1;
+          field = '';
+          while (i < len && text[i] !== delimiter && text[i] !== '\n' && text[i] !== '\r') {
+            field += text[i];
+            i++;
+          }
+          return field;
         }
       }
       return field;

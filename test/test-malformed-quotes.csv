@@ -1,0 +1,1201 @@
+id,name,description,value
+1,item_1,"This quote is never closed,746
+2,item_2,“Smart quoted text”,378
+3,item_3,“Only left smart quote,675
+4,item_4,”Right smart quote as opener“,478
+5,item_5,"Line one
+Line two
+Line three",728
+6,item_6,"He said ""hello"" to them",658
+7,item_7,mid"quote"here,415
+8,item_8,"",404
+9,item_9,"value, with ""comma"" and quote",904
+10,item_10,"This is a normal, quoted field",984
+11,item_11,"This quote is never closed,558
+12,item_12,“Smart quoted text”,489
+13,item_13,“Only left smart quote,949
+14,item_14,”Right smart quote as opener“,944
+15,item_15,"Line one
+Line two
+Line three",755
+16,item_16,"He said ""hello"" to them",157
+17,item_17,mid"quote"here,176
+18,item_18,"",17
+19,item_19,"value, with ""comma"" and quote",728
+20,item_20,"This is a normal, quoted field",818
+21,item_21,"This quote is never closed,320
+22,item_22,“Smart quoted text”,456
+23,item_23,“Only left smart quote,695
+24,item_24,”Right smart quote as opener“,547
+25,item_25,"Line one
+Line two
+Line three",735
+26,item_26,"He said ""hello"" to them",486
+27,item_27,mid"quote"here,775
+28,item_28,"",576
+29,item_29,"value, with ""comma"" and quote",275
+30,item_30,"This is a normal, quoted field",447
+31,item_31,"This quote is never closed,918
+32,item_32,“Smart quoted text”,524
+33,item_33,“Only left smart quote,643
+34,item_34,”Right smart quote as opener“,72
+35,item_35,"Line one
+Line two
+Line three",378
+36,item_36,"He said ""hello"" to them",748
+37,item_37,mid"quote"here,498
+38,item_38,"",533
+39,item_39,"value, with ""comma"" and quote",266
+40,item_40,"This is a normal, quoted field",748
+41,item_41,"This quote is never closed,94
+42,item_42,“Smart quoted text”,420
+43,item_43,“Only left smart quote,219
+44,item_44,”Right smart quote as opener“,17
+45,item_45,"Line one
+Line two
+Line three",729
+46,item_46,"He said ""hello"" to them",307
+47,item_47,mid"quote"here,705
+48,item_48,"",232
+49,item_49,"value, with ""comma"" and quote",799
+50,item_50,"This is a normal, quoted field",67
+51,item_51,"This quote is never closed,13
+52,item_52,“Smart quoted text”,226
+53,item_53,“Only left smart quote,715
+54,item_54,”Right smart quote as opener“,576
+55,item_55,"Line one
+Line two
+Line three",430
+56,item_56,"He said ""hello"" to them",607
+57,item_57,mid"quote"here,491
+58,item_58,"",992
+59,item_59,"value, with ""comma"" and quote",674
+60,item_60,"This is a normal, quoted field",461
+61,item_61,"This quote is never closed,267
+62,item_62,“Smart quoted text”,226
+63,item_63,“Only left smart quote,82
+64,item_64,”Right smart quote as opener“,25
+65,item_65,"Line one
+Line two
+Line three",549
+66,item_66,"He said ""hello"" to them",796
+67,item_67,mid"quote"here,598
+68,item_68,"",753
+69,item_69,"value, with ""comma"" and quote",458
+70,item_70,"This is a normal, quoted field",706
+71,item_71,"This quote is never closed,100
+72,item_72,“Smart quoted text”,669
+73,item_73,“Only left smart quote,755
+74,item_74,”Right smart quote as opener“,498
+75,item_75,"Line one
+Line two
+Line three",72
+76,item_76,"He said ""hello"" to them",415
+77,item_77,mid"quote"here,937
+78,item_78,"",148
+79,item_79,"value, with ""comma"" and quote",190
+80,item_80,"This is a normal, quoted field",905
+81,item_81,"This quote is never closed,174
+82,item_82,“Smart quoted text”,959
+83,item_83,“Only left smart quote,808
+84,item_84,”Right smart quote as opener“,994
+85,item_85,"Line one
+Line two
+Line three",372
+86,item_86,"He said ""hello"" to them",99
+87,item_87,mid"quote"here,924
+88,item_88,"",51
+89,item_89,"value, with ""comma"" and quote",153
+90,item_90,"This is a normal, quoted field",942
+91,item_91,"This quote is never closed,609
+92,item_92,“Smart quoted text”,861
+93,item_93,“Only left smart quote,12
+94,item_94,”Right smart quote as opener“,887
+95,item_95,"Line one
+Line two
+Line three",468
+96,item_96,"He said ""hello"" to them",763
+97,item_97,mid"quote"here,455
+98,item_98,"",778
+99,item_99,"value, with ""comma"" and quote",147
+100,item_100,"This is a normal, quoted field",408
+101,item_101,"This quote is never closed,384
+102,item_102,“Smart quoted text”,611
+103,item_103,“Only left smart quote,417
+104,item_104,”Right smart quote as opener“,68
+105,item_105,"Line one
+Line two
+Line three",513
+106,item_106,"He said ""hello"" to them",671
+107,item_107,mid"quote"here,875
+108,item_108,"",887
+109,item_109,"value, with ""comma"" and quote",106
+110,item_110,"This is a normal, quoted field",751
+111,item_111,"This quote is never closed,780
+112,item_112,“Smart quoted text”,995
+113,item_113,“Only left smart quote,803
+114,item_114,”Right smart quote as opener“,625
+115,item_115,"Line one
+Line two
+Line three",69
+116,item_116,"He said ""hello"" to them",866
+117,item_117,mid"quote"here,829
+118,item_118,"",409
+119,item_119,"value, with ""comma"" and quote",74
+120,item_120,"This is a normal, quoted field",857
+121,item_121,"This quote is never closed,356
+122,item_122,“Smart quoted text”,991
+123,item_123,“Only left smart quote,977
+124,item_124,”Right smart quote as opener“,310
+125,item_125,"Line one
+Line two
+Line three",306
+126,item_126,"He said ""hello"" to them",168
+127,item_127,mid"quote"here,540
+128,item_128,"",136
+129,item_129,"value, with ""comma"" and quote",380
+130,item_130,"This is a normal, quoted field",648
+131,item_131,"This quote is never closed,115
+132,item_132,“Smart quoted text”,285
+133,item_133,“Only left smart quote,578
+134,item_134,”Right smart quote as opener“,587
+135,item_135,"Line one
+Line two
+Line three",502
+136,item_136,"He said ""hello"" to them",5
+137,item_137,mid"quote"here,17
+138,item_138,"",798
+139,item_139,"value, with ""comma"" and quote",665
+140,item_140,"This is a normal, quoted field",296
+141,item_141,"This quote is never closed,296
+142,item_142,“Smart quoted text”,308
+143,item_143,“Only left smart quote,832
+144,item_144,”Right smart quote as opener“,476
+145,item_145,"Line one
+Line two
+Line three",223
+146,item_146,"He said ""hello"" to them",397
+147,item_147,mid"quote"here,26
+148,item_148,"",242
+149,item_149,"value, with ""comma"" and quote",159
+150,item_150,"This is a normal, quoted field",798
+151,item_151,"This quote is never closed,549
+152,item_152,“Smart quoted text”,166
+153,item_153,“Only left smart quote,770
+154,item_154,”Right smart quote as opener“,201
+155,item_155,"Line one
+Line two
+Line three",457
+156,item_156,"He said ""hello"" to them",995
+157,item_157,mid"quote"here,479
+158,item_158,"",712
+159,item_159,"value, with ""comma"" and quote",542
+160,item_160,"This is a normal, quoted field",693
+161,item_161,"This quote is never closed,374
+162,item_162,“Smart quoted text”,445
+163,item_163,“Only left smart quote,875
+164,item_164,”Right smart quote as opener“,610
+165,item_165,"Line one
+Line two
+Line three",879
+166,item_166,"He said ""hello"" to them",878
+167,item_167,mid"quote"here,420
+168,item_168,"",696
+169,item_169,"value, with ""comma"" and quote",952
+170,item_170,"This is a normal, quoted field",145
+171,item_171,"This quote is never closed,761
+172,item_172,“Smart quoted text”,158
+173,item_173,“Only left smart quote,104
+174,item_174,”Right smart quote as opener“,914
+175,item_175,"Line one
+Line two
+Line three",480
+176,item_176,"He said ""hello"" to them",476
+177,item_177,mid"quote"here,1
+178,item_178,"",18
+179,item_179,"value, with ""comma"" and quote",193
+180,item_180,"This is a normal, quoted field",177
+181,item_181,"This quote is never closed,960
+182,item_182,“Smart quoted text”,467
+183,item_183,“Only left smart quote,807
+184,item_184,”Right smart quote as opener“,271
+185,item_185,"Line one
+Line two
+Line three",94
+186,item_186,"He said ""hello"" to them",40
+187,item_187,mid"quote"here,7
+188,item_188,"",763
+189,item_189,"value, with ""comma"" and quote",389
+190,item_190,"This is a normal, quoted field",70
+191,item_191,"This quote is never closed,501
+192,item_192,“Smart quoted text”,146
+193,item_193,“Only left smart quote,521
+194,item_194,”Right smart quote as opener“,614
+195,item_195,"Line one
+Line two
+Line three",85
+196,item_196,"He said ""hello"" to them",270
+197,item_197,mid"quote"here,653
+198,item_198,"",637
+199,item_199,"value, with ""comma"" and quote",17
+200,item_200,"This is a normal, quoted field",514
+201,item_201,"This quote is never closed,35
+202,item_202,“Smart quoted text”,381
+203,item_203,“Only left smart quote,763
+204,item_204,”Right smart quote as opener“,644
+205,item_205,"Line one
+Line two
+Line three",652
+206,item_206,"He said ""hello"" to them",575
+207,item_207,mid"quote"here,639
+208,item_208,"",283
+209,item_209,"value, with ""comma"" and quote",732
+210,item_210,"This is a normal, quoted field",635
+211,item_211,"This quote is never closed,366
+212,item_212,“Smart quoted text”,383
+213,item_213,“Only left smart quote,368
+214,item_214,”Right smart quote as opener“,518
+215,item_215,"Line one
+Line two
+Line three",86
+216,item_216,"He said ""hello"" to them",622
+217,item_217,mid"quote"here,58
+218,item_218,"",381
+219,item_219,"value, with ""comma"" and quote",867
+220,item_220,"This is a normal, quoted field",114
+221,item_221,"This quote is never closed,429
+222,item_222,“Smart quoted text”,697
+223,item_223,“Only left smart quote,224
+224,item_224,”Right smart quote as opener“,356
+225,item_225,"Line one
+Line two
+Line three",933
+226,item_226,"He said ""hello"" to them",6
+227,item_227,mid"quote"here,678
+228,item_228,"",802
+229,item_229,"value, with ""comma"" and quote",799
+230,item_230,"This is a normal, quoted field",921
+231,item_231,"This quote is never closed,918
+232,item_232,“Smart quoted text”,987
+233,item_233,“Only left smart quote,10
+234,item_234,”Right smart quote as opener“,585
+235,item_235,"Line one
+Line two
+Line three",551
+236,item_236,"He said ""hello"" to them",586
+237,item_237,mid"quote"here,600
+238,item_238,"",198
+239,item_239,"value, with ""comma"" and quote",8
+240,item_240,"This is a normal, quoted field",340
+241,item_241,"This quote is never closed,49
+242,item_242,“Smart quoted text”,802
+243,item_243,“Only left smart quote,620
+244,item_244,”Right smart quote as opener“,230
+245,item_245,"Line one
+Line two
+Line three",47
+246,item_246,"He said ""hello"" to them",964
+247,item_247,mid"quote"here,401
+248,item_248,"",826
+249,item_249,"value, with ""comma"" and quote",425
+250,item_250,"This is a normal, quoted field",505
+251,item_251,"This quote is never closed,561
+252,item_252,“Smart quoted text”,206
+253,item_253,“Only left smart quote,519
+254,item_254,”Right smart quote as opener“,956
+255,item_255,"Line one
+Line two
+Line three",297
+256,item_256,"He said ""hello"" to them",346
+257,item_257,mid"quote"here,756
+258,item_258,"",876
+259,item_259,"value, with ""comma"" and quote",871
+260,item_260,"This is a normal, quoted field",406
+261,item_261,"This quote is never closed,746
+262,item_262,“Smart quoted text”,695
+263,item_263,“Only left smart quote,534
+264,item_264,”Right smart quote as opener“,800
+265,item_265,"Line one
+Line two
+Line three",654
+266,item_266,"He said ""hello"" to them",240
+267,item_267,mid"quote"here,288
+268,item_268,"",469
+269,item_269,"value, with ""comma"" and quote",134
+270,item_270,"This is a normal, quoted field",599
+271,item_271,"This quote is never closed,66
+272,item_272,“Smart quoted text”,244
+273,item_273,“Only left smart quote,609
+274,item_274,”Right smart quote as opener“,481
+275,item_275,"Line one
+Line two
+Line three",315
+276,item_276,"He said ""hello"" to them",740
+277,item_277,mid"quote"here,192
+278,item_278,"",721
+279,item_279,"value, with ""comma"" and quote",552
+280,item_280,"This is a normal, quoted field",646
+281,item_281,"This quote is never closed,987
+282,item_282,“Smart quoted text”,101
+283,item_283,“Only left smart quote,889
+284,item_284,”Right smart quote as opener“,851
+285,item_285,"Line one
+Line two
+Line three",113
+286,item_286,"He said ""hello"" to them",118
+287,item_287,mid"quote"here,90
+288,item_288,"",292
+289,item_289,"value, with ""comma"" and quote",165
+290,item_290,"This is a normal, quoted field",890
+291,item_291,"This quote is never closed,165
+292,item_292,“Smart quoted text”,931
+293,item_293,“Only left smart quote,457
+294,item_294,”Right smart quote as opener“,829
+295,item_295,"Line one
+Line two
+Line three",54
+296,item_296,"He said ""hello"" to them",795
+297,item_297,mid"quote"here,778
+298,item_298,"",236
+299,item_299,"value, with ""comma"" and quote",417
+300,item_300,"This is a normal, quoted field",434
+301,item_301,"This quote is never closed,971
+302,item_302,“Smart quoted text”,500
+303,item_303,“Only left smart quote,71
+304,item_304,”Right smart quote as opener“,752
+305,item_305,"Line one
+Line two
+Line three",107
+306,item_306,"He said ""hello"" to them",36
+307,item_307,mid"quote"here,89
+308,item_308,"",596
+309,item_309,"value, with ""comma"" and quote",529
+310,item_310,"This is a normal, quoted field",613
+311,item_311,"This quote is never closed,121
+312,item_312,“Smart quoted text”,3
+313,item_313,“Only left smart quote,571
+314,item_314,”Right smart quote as opener“,259
+315,item_315,"Line one
+Line two
+Line three",938
+316,item_316,"He said ""hello"" to them",522
+317,item_317,mid"quote"here,196
+318,item_318,"",354
+319,item_319,"value, with ""comma"" and quote",755
+320,item_320,"This is a normal, quoted field",527
+321,item_321,"This quote is never closed,368
+322,item_322,“Smart quoted text”,118
+323,item_323,“Only left smart quote,336
+324,item_324,”Right smart quote as opener“,889
+325,item_325,"Line one
+Line two
+Line three",424
+326,item_326,"He said ""hello"" to them",100
+327,item_327,mid"quote"here,448
+328,item_328,"",968
+329,item_329,"value, with ""comma"" and quote",222
+330,item_330,"This is a normal, quoted field",868
+331,item_331,"This quote is never closed,664
+332,item_332,“Smart quoted text”,279
+333,item_333,“Only left smart quote,366
+334,item_334,”Right smart quote as opener“,530
+335,item_335,"Line one
+Line two
+Line three",66
+336,item_336,"He said ""hello"" to them",775
+337,item_337,mid"quote"here,263
+338,item_338,"",240
+339,item_339,"value, with ""comma"" and quote",860
+340,item_340,"This is a normal, quoted field",135
+341,item_341,"This quote is never closed,318
+342,item_342,“Smart quoted text”,370
+343,item_343,“Only left smart quote,466
+344,item_344,”Right smart quote as opener“,968
+345,item_345,"Line one
+Line two
+Line three",30
+346,item_346,"He said ""hello"" to them",479
+347,item_347,mid"quote"here,73
+348,item_348,"",344
+349,item_349,"value, with ""comma"" and quote",284
+350,item_350,"This is a normal, quoted field",748
+351,item_351,"This quote is never closed,223
+352,item_352,“Smart quoted text”,541
+353,item_353,“Only left smart quote,603
+354,item_354,”Right smart quote as opener“,32
+355,item_355,"Line one
+Line two
+Line three",446
+356,item_356,"He said ""hello"" to them",445
+357,item_357,mid"quote"here,669
+358,item_358,"",189
+359,item_359,"value, with ""comma"" and quote",469
+360,item_360,"This is a normal, quoted field",474
+361,item_361,"This quote is never closed,856
+362,item_362,“Smart quoted text”,841
+363,item_363,“Only left smart quote,35
+364,item_364,”Right smart quote as opener“,460
+365,item_365,"Line one
+Line two
+Line three",97
+366,item_366,"He said ""hello"" to them",223
+367,item_367,mid"quote"here,872
+368,item_368,"",380
+369,item_369,"value, with ""comma"" and quote",832
+370,item_370,"This is a normal, quoted field",273
+371,item_371,"This quote is never closed,832
+372,item_372,“Smart quoted text”,350
+373,item_373,“Only left smart quote,346
+374,item_374,”Right smart quote as opener“,627
+375,item_375,"Line one
+Line two
+Line three",733
+376,item_376,"He said ""hello"" to them",777
+377,item_377,mid"quote"here,252
+378,item_378,"",668
+379,item_379,"value, with ""comma"" and quote",938
+380,item_380,"This is a normal, quoted field",99
+381,item_381,"This quote is never closed,423
+382,item_382,“Smart quoted text”,287
+383,item_383,“Only left smart quote,207
+384,item_384,”Right smart quote as opener“,980
+385,item_385,"Line one
+Line two
+Line three",141
+386,item_386,"He said ""hello"" to them",517
+387,item_387,mid"quote"here,838
+388,item_388,"",419
+389,item_389,"value, with ""comma"" and quote",748
+390,item_390,"This is a normal, quoted field",687
+391,item_391,"This quote is never closed,650
+392,item_392,“Smart quoted text”,621
+393,item_393,“Only left smart quote,583
+394,item_394,”Right smart quote as opener“,262
+395,item_395,"Line one
+Line two
+Line three",815
+396,item_396,"He said ""hello"" to them",86
+397,item_397,mid"quote"here,477
+398,item_398,"",20
+399,item_399,"value, with ""comma"" and quote",95
+400,item_400,"This is a normal, quoted field",791
+401,item_401,"This quote is never closed,600
+402,item_402,“Smart quoted text”,719
+403,item_403,“Only left smart quote,488
+404,item_404,”Right smart quote as opener“,889
+405,item_405,"Line one
+Line two
+Line three",935
+406,item_406,"He said ""hello"" to them",927
+407,item_407,mid"quote"here,845
+408,item_408,"",816
+409,item_409,"value, with ""comma"" and quote",155
+410,item_410,"This is a normal, quoted field",137
+411,item_411,"This quote is never closed,465
+412,item_412,“Smart quoted text”,225
+413,item_413,“Only left smart quote,193
+414,item_414,”Right smart quote as opener“,865
+415,item_415,"Line one
+Line two
+Line three",202
+416,item_416,"He said ""hello"" to them",646
+417,item_417,mid"quote"here,282
+418,item_418,"",861
+419,item_419,"value, with ""comma"" and quote",135
+420,item_420,"This is a normal, quoted field",290
+421,item_421,"This quote is never closed,748
+422,item_422,“Smart quoted text”,89
+423,item_423,“Only left smart quote,307
+424,item_424,”Right smart quote as opener“,875
+425,item_425,"Line one
+Line two
+Line three",337
+426,item_426,"He said ""hello"" to them",645
+427,item_427,mid"quote"here,576
+428,item_428,"",923
+429,item_429,"value, with ""comma"" and quote",351
+430,item_430,"This is a normal, quoted field",266
+431,item_431,"This quote is never closed,118
+432,item_432,“Smart quoted text”,389
+433,item_433,“Only left smart quote,384
+434,item_434,”Right smart quote as opener“,572
+435,item_435,"Line one
+Line two
+Line three",589
+436,item_436,"He said ""hello"" to them",62
+437,item_437,mid"quote"here,937
+438,item_438,"",718
+439,item_439,"value, with ""comma"" and quote",508
+440,item_440,"This is a normal, quoted field",630
+441,item_441,"This quote is never closed,689
+442,item_442,“Smart quoted text”,603
+443,item_443,“Only left smart quote,859
+444,item_444,”Right smart quote as opener“,818
+445,item_445,"Line one
+Line two
+Line three",702
+446,item_446,"He said ""hello"" to them",282
+447,item_447,mid"quote"here,483
+448,item_448,"",497
+449,item_449,"value, with ""comma"" and quote",357
+450,item_450,"This is a normal, quoted field",758
+451,item_451,"This quote is never closed,241
+452,item_452,“Smart quoted text”,191
+453,item_453,“Only left smart quote,286
+454,item_454,”Right smart quote as opener“,795
+455,item_455,"Line one
+Line two
+Line three",534
+456,item_456,"He said ""hello"" to them",860
+457,item_457,mid"quote"here,84
+458,item_458,"",913
+459,item_459,"value, with ""comma"" and quote",167
+460,item_460,"This is a normal, quoted field",397
+461,item_461,"This quote is never closed,94
+462,item_462,“Smart quoted text”,217
+463,item_463,“Only left smart quote,109
+464,item_464,”Right smart quote as opener“,709
+465,item_465,"Line one
+Line two
+Line three",31
+466,item_466,"He said ""hello"" to them",227
+467,item_467,mid"quote"here,184
+468,item_468,"",827
+469,item_469,"value, with ""comma"" and quote",734
+470,item_470,"This is a normal, quoted field",356
+471,item_471,"This quote is never closed,207
+472,item_472,“Smart quoted text”,919
+473,item_473,“Only left smart quote,833
+474,item_474,”Right smart quote as opener“,192
+475,item_475,"Line one
+Line two
+Line three",615
+476,item_476,"He said ""hello"" to them",629
+477,item_477,mid"quote"here,592
+478,item_478,"",244
+479,item_479,"value, with ""comma"" and quote",107
+480,item_480,"This is a normal, quoted field",648
+481,item_481,"This quote is never closed,732
+482,item_482,“Smart quoted text”,310
+483,item_483,“Only left smart quote,342
+484,item_484,”Right smart quote as opener“,913
+485,item_485,"Line one
+Line two
+Line three",509
+486,item_486,"He said ""hello"" to them",116
+487,item_487,mid"quote"here,210
+488,item_488,"",355
+489,item_489,"value, with ""comma"" and quote",818
+490,item_490,"This is a normal, quoted field",393
+491,item_491,"This quote is never closed,716
+492,item_492,“Smart quoted text”,585
+493,item_493,“Only left smart quote,611
+494,item_494,”Right smart quote as opener“,31
+495,item_495,"Line one
+Line two
+Line three",14
+496,item_496,"He said ""hello"" to them",445
+497,item_497,mid"quote"here,419
+498,item_498,"",489
+499,item_499,"value, with ""comma"" and quote",596
+500,item_500,"This is a normal, quoted field",805
+501,item_501,"This quote is never closed,242
+502,item_502,“Smart quoted text”,101
+503,item_503,“Only left smart quote,211
+504,item_504,”Right smart quote as opener“,540
+505,item_505,"Line one
+Line two
+Line three",602
+506,item_506,"He said ""hello"" to them",433
+507,item_507,mid"quote"here,501
+508,item_508,"",66
+509,item_509,"value, with ""comma"" and quote",35
+510,item_510,"This is a normal, quoted field",363
+511,item_511,"This quote is never closed,912
+512,item_512,“Smart quoted text”,369
+513,item_513,“Only left smart quote,800
+514,item_514,”Right smart quote as opener“,22
+515,item_515,"Line one
+Line two
+Line three",904
+516,item_516,"He said ""hello"" to them",902
+517,item_517,mid"quote"here,100
+518,item_518,"",264
+519,item_519,"value, with ""comma"" and quote",991
+520,item_520,"This is a normal, quoted field",293
+521,item_521,"This quote is never closed,568
+522,item_522,“Smart quoted text”,817
+523,item_523,“Only left smart quote,640
+524,item_524,”Right smart quote as opener“,224
+525,item_525,"Line one
+Line two
+Line three",342
+526,item_526,"He said ""hello"" to them",772
+527,item_527,mid"quote"here,562
+528,item_528,"",445
+529,item_529,"value, with ""comma"" and quote",461
+530,item_530,"This is a normal, quoted field",568
+531,item_531,"This quote is never closed,434
+532,item_532,“Smart quoted text”,270
+533,item_533,“Only left smart quote,905
+534,item_534,”Right smart quote as opener“,119
+535,item_535,"Line one
+Line two
+Line three",569
+536,item_536,"He said ""hello"" to them",505
+537,item_537,mid"quote"here,38
+538,item_538,"",263
+539,item_539,"value, with ""comma"" and quote",572
+540,item_540,"This is a normal, quoted field",192
+541,item_541,"This quote is never closed,733
+542,item_542,“Smart quoted text”,159
+543,item_543,“Only left smart quote,518
+544,item_544,”Right smart quote as opener“,87
+545,item_545,"Line one
+Line two
+Line three",988
+546,item_546,"He said ""hello"" to them",809
+547,item_547,mid"quote"here,678
+548,item_548,"",263
+549,item_549,"value, with ""comma"" and quote",267
+550,item_550,"This is a normal, quoted field",360
+551,item_551,"This quote is never closed,320
+552,item_552,“Smart quoted text”,764
+553,item_553,“Only left smart quote,394
+554,item_554,”Right smart quote as opener“,327
+555,item_555,"Line one
+Line two
+Line three",629
+556,item_556,"He said ""hello"" to them",705
+557,item_557,mid"quote"here,255
+558,item_558,"",416
+559,item_559,"value, with ""comma"" and quote",263
+560,item_560,"This is a normal, quoted field",714
+561,item_561,"This quote is never closed,98
+562,item_562,“Smart quoted text”,81
+563,item_563,“Only left smart quote,587
+564,item_564,”Right smart quote as opener“,153
+565,item_565,"Line one
+Line two
+Line three",700
+566,item_566,"He said ""hello"" to them",486
+567,item_567,mid"quote"here,111
+568,item_568,"",983
+569,item_569,"value, with ""comma"" and quote",213
+570,item_570,"This is a normal, quoted field",27
+571,item_571,"This quote is never closed,162
+572,item_572,“Smart quoted text”,727
+573,item_573,“Only left smart quote,923
+574,item_574,”Right smart quote as opener“,57
+575,item_575,"Line one
+Line two
+Line three",326
+576,item_576,"He said ""hello"" to them",385
+577,item_577,mid"quote"here,753
+578,item_578,"",990
+579,item_579,"value, with ""comma"" and quote",691
+580,item_580,"This is a normal, quoted field",751
+581,item_581,"This quote is never closed,754
+582,item_582,“Smart quoted text”,429
+583,item_583,“Only left smart quote,416
+584,item_584,”Right smart quote as opener“,19
+585,item_585,"Line one
+Line two
+Line three",384
+586,item_586,"He said ""hello"" to them",468
+587,item_587,mid"quote"here,660
+588,item_588,"",77
+589,item_589,"value, with ""comma"" and quote",850
+590,item_590,"This is a normal, quoted field",837
+591,item_591,"This quote is never closed,409
+592,item_592,“Smart quoted text”,415
+593,item_593,“Only left smart quote,301
+594,item_594,”Right smart quote as opener“,49
+595,item_595,"Line one
+Line two
+Line three",226
+596,item_596,"He said ""hello"" to them",40
+597,item_597,mid"quote"here,136
+598,item_598,"",180
+599,item_599,"value, with ""comma"" and quote",448
+600,item_600,"This is a normal, quoted field",302
+601,item_601,"This quote is never closed,236
+602,item_602,“Smart quoted text”,471
+603,item_603,“Only left smart quote,884
+604,item_604,”Right smart quote as opener“,49
+605,item_605,"Line one
+Line two
+Line three",370
+606,item_606,"He said ""hello"" to them",386
+607,item_607,mid"quote"here,516
+608,item_608,"",4
+609,item_609,"value, with ""comma"" and quote",584
+610,item_610,"This is a normal, quoted field",292
+611,item_611,"This quote is never closed,255
+612,item_612,“Smart quoted text”,785
+613,item_613,“Only left smart quote,835
+614,item_614,”Right smart quote as opener“,407
+615,item_615,"Line one
+Line two
+Line three",282
+616,item_616,"He said ""hello"" to them",459
+617,item_617,mid"quote"here,660
+618,item_618,"",193
+619,item_619,"value, with ""comma"" and quote",987
+620,item_620,"This is a normal, quoted field",43
+621,item_621,"This quote is never closed,160
+622,item_622,“Smart quoted text”,822
+623,item_623,“Only left smart quote,73
+624,item_624,”Right smart quote as opener“,863
+625,item_625,"Line one
+Line two
+Line three",76
+626,item_626,"He said ""hello"" to them",903
+627,item_627,mid"quote"here,800
+628,item_628,"",175
+629,item_629,"value, with ""comma"" and quote",252
+630,item_630,"This is a normal, quoted field",88
+631,item_631,"This quote is never closed,974
+632,item_632,“Smart quoted text”,940
+633,item_633,“Only left smart quote,242
+634,item_634,”Right smart quote as opener“,752
+635,item_635,"Line one
+Line two
+Line three",639
+636,item_636,"He said ""hello"" to them",187
+637,item_637,mid"quote"here,370
+638,item_638,"",387
+639,item_639,"value, with ""comma"" and quote",53
+640,item_640,"This is a normal, quoted field",838
+641,item_641,"This quote is never closed,999
+642,item_642,“Smart quoted text”,844
+643,item_643,“Only left smart quote,961
+644,item_644,”Right smart quote as opener“,435
+645,item_645,"Line one
+Line two
+Line three",315
+646,item_646,"He said ""hello"" to them",130
+647,item_647,mid"quote"here,699
+648,item_648,"",644
+649,item_649,"value, with ""comma"" and quote",376
+650,item_650,"This is a normal, quoted field",859
+651,item_651,"This quote is never closed,151
+652,item_652,“Smart quoted text”,963
+653,item_653,“Only left smart quote,745
+654,item_654,”Right smart quote as opener“,62
+655,item_655,"Line one
+Line two
+Line three",107
+656,item_656,"He said ""hello"" to them",534
+657,item_657,mid"quote"here,458
+658,item_658,"",477
+659,item_659,"value, with ""comma"" and quote",45
+660,item_660,"This is a normal, quoted field",458
+661,item_661,"This quote is never closed,617
+662,item_662,“Smart quoted text”,1
+663,item_663,“Only left smart quote,863
+664,item_664,”Right smart quote as opener“,538
+665,item_665,"Line one
+Line two
+Line three",400
+666,item_666,"He said ""hello"" to them",433
+667,item_667,mid"quote"here,602
+668,item_668,"",832
+669,item_669,"value, with ""comma"" and quote",752
+670,item_670,"This is a normal, quoted field",202
+671,item_671,"This quote is never closed,680
+672,item_672,“Smart quoted text”,940
+673,item_673,“Only left smart quote,552
+674,item_674,”Right smart quote as opener“,188
+675,item_675,"Line one
+Line two
+Line three",684
+676,item_676,"He said ""hello"" to them",429
+677,item_677,mid"quote"here,529
+678,item_678,"",345
+679,item_679,"value, with ""comma"" and quote",235
+680,item_680,"This is a normal, quoted field",291
+681,item_681,"This quote is never closed,714
+682,item_682,“Smart quoted text”,233
+683,item_683,“Only left smart quote,966
+684,item_684,”Right smart quote as opener“,856
+685,item_685,"Line one
+Line two
+Line three",701
+686,item_686,"He said ""hello"" to them",152
+687,item_687,mid"quote"here,147
+688,item_688,"",57
+689,item_689,"value, with ""comma"" and quote",513
+690,item_690,"This is a normal, quoted field",14
+691,item_691,"This quote is never closed,971
+692,item_692,“Smart quoted text”,446
+693,item_693,“Only left smart quote,334
+694,item_694,”Right smart quote as opener“,618
+695,item_695,"Line one
+Line two
+Line three",70
+696,item_696,"He said ""hello"" to them",889
+697,item_697,mid"quote"here,909
+698,item_698,"",481
+699,item_699,"value, with ""comma"" and quote",234
+700,item_700,"This is a normal, quoted field",329
+701,item_701,"This quote is never closed,875
+702,item_702,“Smart quoted text”,880
+703,item_703,“Only left smart quote,924
+704,item_704,”Right smart quote as opener“,518
+705,item_705,"Line one
+Line two
+Line three",822
+706,item_706,"He said ""hello"" to them",267
+707,item_707,mid"quote"here,578
+708,item_708,"",150
+709,item_709,"value, with ""comma"" and quote",346
+710,item_710,"This is a normal, quoted field",704
+711,item_711,"This quote is never closed,235
+712,item_712,“Smart quoted text”,271
+713,item_713,“Only left smart quote,889
+714,item_714,”Right smart quote as opener“,486
+715,item_715,"Line one
+Line two
+Line three",535
+716,item_716,"He said ""hello"" to them",395
+717,item_717,mid"quote"here,653
+718,item_718,"",596
+719,item_719,"value, with ""comma"" and quote",608
+720,item_720,"This is a normal, quoted field",219
+721,item_721,"This quote is never closed,340
+722,item_722,“Smart quoted text”,160
+723,item_723,“Only left smart quote,877
+724,item_724,”Right smart quote as opener“,349
+725,item_725,"Line one
+Line two
+Line three",37
+726,item_726,"He said ""hello"" to them",544
+727,item_727,mid"quote"here,331
+728,item_728,"",943
+729,item_729,"value, with ""comma"" and quote",1
+730,item_730,"This is a normal, quoted field",270
+731,item_731,"This quote is never closed,273
+732,item_732,“Smart quoted text”,678
+733,item_733,“Only left smart quote,632
+734,item_734,”Right smart quote as opener“,379
+735,item_735,"Line one
+Line two
+Line three",92
+736,item_736,"He said ""hello"" to them",936
+737,item_737,mid"quote"here,426
+738,item_738,"",431
+739,item_739,"value, with ""comma"" and quote",78
+740,item_740,"This is a normal, quoted field",639
+741,item_741,"This quote is never closed,163
+742,item_742,“Smart quoted text”,763
+743,item_743,“Only left smart quote,824
+744,item_744,”Right smart quote as opener“,613
+745,item_745,"Line one
+Line two
+Line three",150
+746,item_746,"He said ""hello"" to them",194
+747,item_747,mid"quote"here,239
+748,item_748,"",907
+749,item_749,"value, with ""comma"" and quote",757
+750,item_750,"This is a normal, quoted field",803
+751,item_751,"This quote is never closed,690
+752,item_752,“Smart quoted text”,961
+753,item_753,“Only left smart quote,68
+754,item_754,”Right smart quote as opener“,969
+755,item_755,"Line one
+Line two
+Line three",338
+756,item_756,"He said ""hello"" to them",37
+757,item_757,mid"quote"here,888
+758,item_758,"",291
+759,item_759,"value, with ""comma"" and quote",165
+760,item_760,"This is a normal, quoted field",808
+761,item_761,"This quote is never closed,935
+762,item_762,“Smart quoted text”,580
+763,item_763,“Only left smart quote,743
+764,item_764,”Right smart quote as opener“,538
+765,item_765,"Line one
+Line two
+Line three",444
+766,item_766,"He said ""hello"" to them",562
+767,item_767,mid"quote"here,270
+768,item_768,"",716
+769,item_769,"value, with ""comma"" and quote",6
+770,item_770,"This is a normal, quoted field",438
+771,item_771,"This quote is never closed,900
+772,item_772,“Smart quoted text”,594
+773,item_773,“Only left smart quote,911
+774,item_774,”Right smart quote as opener“,988
+775,item_775,"Line one
+Line two
+Line three",913
+776,item_776,"He said ""hello"" to them",503
+777,item_777,mid"quote"here,771
+778,item_778,"",341
+779,item_779,"value, with ""comma"" and quote",738
+780,item_780,"This is a normal, quoted field",381
+781,item_781,"This quote is never closed,701
+782,item_782,“Smart quoted text”,91
+783,item_783,“Only left smart quote,370
+784,item_784,”Right smart quote as opener“,385
+785,item_785,"Line one
+Line two
+Line three",855
+786,item_786,"He said ""hello"" to them",902
+787,item_787,mid"quote"here,211
+788,item_788,"",33
+789,item_789,"value, with ""comma"" and quote",586
+790,item_790,"This is a normal, quoted field",275
+791,item_791,"This quote is never closed,869
+792,item_792,“Smart quoted text”,746
+793,item_793,“Only left smart quote,9
+794,item_794,”Right smart quote as opener“,600
+795,item_795,"Line one
+Line two
+Line three",946
+796,item_796,"He said ""hello"" to them",223
+797,item_797,mid"quote"here,263
+798,item_798,"",196
+799,item_799,"value, with ""comma"" and quote",329
+800,item_800,"This is a normal, quoted field",535
+801,item_801,"This quote is never closed,238
+802,item_802,“Smart quoted text”,452
+803,item_803,“Only left smart quote,45
+804,item_804,”Right smart quote as opener“,366
+805,item_805,"Line one
+Line two
+Line three",52
+806,item_806,"He said ""hello"" to them",749
+807,item_807,mid"quote"here,192
+808,item_808,"",282
+809,item_809,"value, with ""comma"" and quote",64
+810,item_810,"This is a normal, quoted field",318
+811,item_811,"This quote is never closed,978
+812,item_812,“Smart quoted text”,456
+813,item_813,“Only left smart quote,704
+814,item_814,”Right smart quote as opener“,678
+815,item_815,"Line one
+Line two
+Line three",408
+816,item_816,"He said ""hello"" to them",744
+817,item_817,mid"quote"here,896
+818,item_818,"",825
+819,item_819,"value, with ""comma"" and quote",634
+820,item_820,"This is a normal, quoted field",520
+821,item_821,"This quote is never closed,355
+822,item_822,“Smart quoted text”,818
+823,item_823,“Only left smart quote,526
+824,item_824,”Right smart quote as opener“,177
+825,item_825,"Line one
+Line two
+Line three",543
+826,item_826,"He said ""hello"" to them",920
+827,item_827,mid"quote"here,467
+828,item_828,"",700
+829,item_829,"value, with ""comma"" and quote",575
+830,item_830,"This is a normal, quoted field",956
+831,item_831,"This quote is never closed,919
+832,item_832,“Smart quoted text”,225
+833,item_833,“Only left smart quote,830
+834,item_834,”Right smart quote as opener“,41
+835,item_835,"Line one
+Line two
+Line three",790
+836,item_836,"He said ""hello"" to them",963
+837,item_837,mid"quote"here,575
+838,item_838,"",322
+839,item_839,"value, with ""comma"" and quote",130
+840,item_840,"This is a normal, quoted field",445
+841,item_841,"This quote is never closed,366
+842,item_842,“Smart quoted text”,920
+843,item_843,“Only left smart quote,184
+844,item_844,”Right smart quote as opener“,431
+845,item_845,"Line one
+Line two
+Line three",517
+846,item_846,"He said ""hello"" to them",695
+847,item_847,mid"quote"here,346
+848,item_848,"",449
+849,item_849,"value, with ""comma"" and quote",413
+850,item_850,"This is a normal, quoted field",13
+851,item_851,"This quote is never closed,30
+852,item_852,“Smart quoted text”,333
+853,item_853,“Only left smart quote,952
+854,item_854,”Right smart quote as opener“,153
+855,item_855,"Line one
+Line two
+Line three",996
+856,item_856,"He said ""hello"" to them",674
+857,item_857,mid"quote"here,894
+858,item_858,"",542
+859,item_859,"value, with ""comma"" and quote",171
+860,item_860,"This is a normal, quoted field",598
+861,item_861,"This quote is never closed,396
+862,item_862,“Smart quoted text”,426
+863,item_863,“Only left smart quote,473
+864,item_864,”Right smart quote as opener“,775
+865,item_865,"Line one
+Line two
+Line three",522
+866,item_866,"He said ""hello"" to them",182
+867,item_867,mid"quote"here,698
+868,item_868,"",54
+869,item_869,"value, with ""comma"" and quote",8
+870,item_870,"This is a normal, quoted field",889
+871,item_871,"This quote is never closed,979
+872,item_872,“Smart quoted text”,647
+873,item_873,“Only left smart quote,52
+874,item_874,”Right smart quote as opener“,350
+875,item_875,"Line one
+Line two
+Line three",860
+876,item_876,"He said ""hello"" to them",260
+877,item_877,mid"quote"here,420
+878,item_878,"",176
+879,item_879,"value, with ""comma"" and quote",506
+880,item_880,"This is a normal, quoted field",70
+881,item_881,"This quote is never closed,659
+882,item_882,“Smart quoted text”,141
+883,item_883,“Only left smart quote,98
+884,item_884,”Right smart quote as opener“,967
+885,item_885,"Line one
+Line two
+Line three",670
+886,item_886,"He said ""hello"" to them",414
+887,item_887,mid"quote"here,922
+888,item_888,"",971
+889,item_889,"value, with ""comma"" and quote",450
+890,item_890,"This is a normal, quoted field",869
+891,item_891,"This quote is never closed,204
+892,item_892,“Smart quoted text”,200
+893,item_893,“Only left smart quote,272
+894,item_894,”Right smart quote as opener“,92
+895,item_895,"Line one
+Line two
+Line three",203
+896,item_896,"He said ""hello"" to them",333
+897,item_897,mid"quote"here,82
+898,item_898,"",256
+899,item_899,"value, with ""comma"" and quote",610
+900,item_900,"This is a normal, quoted field",957
+901,item_901,"This quote is never closed,403
+902,item_902,“Smart quoted text”,542
+903,item_903,“Only left smart quote,775
+904,item_904,”Right smart quote as opener“,699
+905,item_905,"Line one
+Line two
+Line three",520
+906,item_906,"He said ""hello"" to them",216
+907,item_907,mid"quote"here,795
+908,item_908,"",554
+909,item_909,"value, with ""comma"" and quote",227
+910,item_910,"This is a normal, quoted field",62
+911,item_911,"This quote is never closed,992
+912,item_912,“Smart quoted text”,327
+913,item_913,“Only left smart quote,920
+914,item_914,”Right smart quote as opener“,296
+915,item_915,"Line one
+Line two
+Line three",821
+916,item_916,"He said ""hello"" to them",572
+917,item_917,mid"quote"here,328
+918,item_918,"",644
+919,item_919,"value, with ""comma"" and quote",728
+920,item_920,"This is a normal, quoted field",956
+921,item_921,"This quote is never closed,629
+922,item_922,“Smart quoted text”,716
+923,item_923,“Only left smart quote,994
+924,item_924,”Right smart quote as opener“,442
+925,item_925,"Line one
+Line two
+Line three",282
+926,item_926,"He said ""hello"" to them",346
+927,item_927,mid"quote"here,104
+928,item_928,"",199
+929,item_929,"value, with ""comma"" and quote",311
+930,item_930,"This is a normal, quoted field",53
+931,item_931,"This quote is never closed,649
+932,item_932,“Smart quoted text”,652
+933,item_933,“Only left smart quote,348
+934,item_934,”Right smart quote as opener“,274
+935,item_935,"Line one
+Line two
+Line three",331
+936,item_936,"He said ""hello"" to them",565
+937,item_937,mid"quote"here,208
+938,item_938,"",534
+939,item_939,"value, with ""comma"" and quote",57
+940,item_940,"This is a normal, quoted field",581
+941,item_941,"This quote is never closed,281
+942,item_942,“Smart quoted text”,198
+943,item_943,“Only left smart quote,689
+944,item_944,”Right smart quote as opener“,104
+945,item_945,"Line one
+Line two
+Line three",514
+946,item_946,"He said ""hello"" to them",969
+947,item_947,mid"quote"here,465
+948,item_948,"",952
+949,item_949,"value, with ""comma"" and quote",277
+950,item_950,"This is a normal, quoted field",790
+951,item_951,"This quote is never closed,620
+952,item_952,“Smart quoted text”,672
+953,item_953,“Only left smart quote,879
+954,item_954,”Right smart quote as opener“,298
+955,item_955,"Line one
+Line two
+Line three",253
+956,item_956,"He said ""hello"" to them",920
+957,item_957,mid"quote"here,37
+958,item_958,"",490
+959,item_959,"value, with ""comma"" and quote",950
+960,item_960,"This is a normal, quoted field",832
+961,item_961,"This quote is never closed,43
+962,item_962,“Smart quoted text”,765
+963,item_963,“Only left smart quote,220
+964,item_964,”Right smart quote as opener“,771
+965,item_965,"Line one
+Line two
+Line three",959
+966,item_966,"He said ""hello"" to them",986
+967,item_967,mid"quote"here,243
+968,item_968,"",369
+969,item_969,"value, with ""comma"" and quote",579
+970,item_970,"This is a normal, quoted field",724
+971,item_971,"This quote is never closed,995
+972,item_972,“Smart quoted text”,262
+973,item_973,“Only left smart quote,458
+974,item_974,”Right smart quote as opener“,339
+975,item_975,"Line one
+Line two
+Line three",264
+976,item_976,"He said ""hello"" to them",435
+977,item_977,mid"quote"here,786
+978,item_978,"",60
+979,item_979,"value, with ""comma"" and quote",572
+980,item_980,"This is a normal, quoted field",572
+981,item_981,"This quote is never closed,400
+982,item_982,“Smart quoted text”,709
+983,item_983,“Only left smart quote,584
+984,item_984,”Right smart quote as opener“,321
+985,item_985,"Line one
+Line two
+Line three",683
+986,item_986,"He said ""hello"" to them",241
+987,item_987,mid"quote"here,967
+988,item_988,"",886
+989,item_989,"value, with ""comma"" and quote",675
+990,item_990,"This is a normal, quoted field",729
+991,item_991,"This quote is never closed,301
+992,item_992,“Smart quoted text”,847
+993,item_993,“Only left smart quote,139
+994,item_994,”Right smart quote as opener“,995
+995,item_995,"Line one
+Line two
+Line three",9
+996,item_996,"He said ""hello"" to them",607
+997,item_997,mid"quote"here,885
+998,item_998,"",488
+999,item_999,"value, with ""comma"" and quote",887
+1000,item_1000,"This is a normal, quoted field",389
