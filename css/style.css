@@ -244,6 +244,8 @@ label input[type="checkbox"] { cursor: pointer; }
 .col-profile-card.type-email { border-left-color: var(--success); }
 .col-profile-card.type-boolean { border-left-color: #9b59b6; }
 .col-profile-card.type-phone { border-left-color: #1abc9c; }
+.col-profile-card.type-money { border-left-color: #2ecc71; }
+.col-profile-card.type-mixed { border-left-color: #e67e22; }
 
 .col-profile-card .cp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .col-profile-card .cp-name { font-weight: 600; font-size: 13px; }

@@ -10,9 +10,9 @@ self.onmessage = function (e) {
   try {
     switch (task) {
       case 'parse': {
-        const { headers, rows } = parseCSV(payload.text, payload.config);
+        const { headers, rows, parseErrors } = parseCSV(payload.text, payload.config);
         const profile = profileDataset(headers, rows);
-        send({ success: true, headers, rows, profile });
+        send({ success: true, headers, rows, profile, parseErrors: parseErrors || [] });
         break;
       }
       case 'profile': {
@@ -39,39 +39,95 @@ self.onmessage = function (e) {
 };
 
 /* ============================================================
-   CSV PARSER — handles quoted fields, embedded commas, newlines
+   CSV PARSER — handles quoted fields, embedded commas, newlines,
+   smart quotes, malformed rows, duplicate headers
    ============================================================ */
+
+/* --- Quote character helpers --- */
+function isOpenQuote(ch) {
+  return ch === '"' || ch === '\u201c'; // " or LEFT DOUBLE QUOTATION MARK
+}
+
+function isCloseQuote(ch, openChar) {
+  if (openChar === '"') return ch === '"';
+  if (openChar === '\u201c') return ch === '\u201d' || ch === '"'; // accept RIGHT or straight
+  return ch === '"' || ch === '\u201d';
+}
+
+function isAnyQuote(ch) {
+  return ch === '"' || ch === '\u201c' || ch === '\u201d';
+}
+
 function parseCSV(text, config) {
   config = config || {};
   const delimiter = config.delimiter || detectDelimiter(text);
   const hasHeader = config.hasHeader !== false;
+  const parseErrors = [];
 
   const rows = [];
   let i = 0;
   const len = text.length;
+  let currentRow = 0;
 
   function parseField() {
     if (i >= len) return '';
-    if (text[i] === '"' || text[i] === '\u201c' || text[i] === '\u201d') {
-      const quote = text[i];
+
+    if (isAnyQuote(text[i])) {
+      const openChar = text[i];
       i++;
       let field = '';
+      let closed = false;
+      const startRow = currentRow;
+
       while (i < len) {
-        if (text[i] === quote) {
-          if (i + 1 < len && (text[i + 1] === quote || text[i + 1] === '\u201c' || text[i + 1] === '\u201d')) {
-            field += quote === '"' ? '"' : text[i];
+        const ch = text[i];
+
+        if (isCloseQuote(ch, openChar)) {
+          // Check for escaped (doubled) quote
+          if (i + 1 < len && isAnyQuote(text[i + 1])) {
+            field += '"'; // collapsed to standard double-quote
             i += 2;
           } else {
-            i++;
+            i++; // skip closing quote
+            closed = true;
             break;
           }
+        } else if (ch === '\n' || ch === '\r') {
+          // Allow embedded newlines in quoted fields, but detect unclosed quotes
+          // Heuristic: if we see too many consecutive newlines, it's likely unclosed
+          let nlCount = 0, la = i;
+          while (la < len && (text[la] === '\n' || text[la] === '\r')) { nlCount++; la++; }
+          if (nlCount > 50) {
+            parseErrors.push({ row: startRow, message: 'Unclosed quote; treating as unquoted at line boundary' });
+            break;
+          }
+          field += ch;
+          i++;
         } else {
-          field += text[i];
+          field += ch;
           i++;
         }
       }
+
+      if (!closed && i >= len) {
+        parseErrors.push({ row: startRow, message: 'Unclosed quote at end of file' });
+      }
+
+      // Skip any junk after closing quote until delimiter or newline
+      if (closed && i < len && text[i] !== delimiter && text[i] !== '\n' && text[i] !== '\r') {
+        let junkLen = 0;
+        while (i < len && text[i] !== delimiter && text[i] !== '\n' && text[i] !== '\r') {
+          junkLen++;
+          i++;
+        }
+        if (junkLen > 0) {
+          parseErrors.push({ row: startRow, message: 'Junk after closing quote (' + junkLen + ' chars skipped)' });
+        }
+      }
+
       return field;
     } else {
+      // Unquoted field
       let field = '';
       while (i < len && text[i] !== delimiter && text[i] !== '\n' && text[i] !== '\r') {
         field += text[i];
@@ -90,7 +146,7 @@ function parseCSV(text, config) {
       if (text[i] === delimiter) {
         i++;
         if (i >= len || text[i] === '\n' || text[i] === '\r') {
-          row.push('');
+          row.push(''); // trailing delimiter → empty field
         }
         continue;
       }
@@ -111,6 +167,7 @@ function parseCSV(text, config) {
   if (text.charCodeAt(0) === 0xFEFF) i++;
 
   while (i < len) {
+    // Skip blank lines
     if (text[i] === '\n' || text[i] === '\r') {
       if (text[i] === '\r' && i + 1 < len && text[i + 1] === '\n') i += 2;
       else i++;
@@ -120,8 +177,10 @@ function parseCSV(text, config) {
     if (row.length > 0 && !(row.length === 1 && row[0] === '')) {
       rows.push(row);
     }
+    currentRow++;
   }
 
+  // Separate headers from data
   let headers;
   let dataRows;
   if (hasHeader && rows.length > 0) {
@@ -133,13 +192,36 @@ function parseCSV(text, config) {
     dataRows = rows;
   }
 
-  const colCount = headers.length;
-  for (let r = 0; r < dataRows.length; r++) {
-    while (dataRows[r].length < colCount) dataRows[r].push('');
-    if (dataRows[r].length > colCount) dataRows[r] = dataRows[r].slice(0, colCount);
+  // Handle duplicate column names: append _2, _3, etc.
+  const headerSeen = new Map();
+  for (let h = 0; h < headers.length; h++) {
+    const orig = headers[h].trim();
+    headers[h] = orig;
+    if (headerSeen.has(orig)) {
+      const count = headerSeen.get(orig) + 1;
+      headerSeen.set(orig, count);
+      headers[h] = orig + '_' + count;
+      parseErrors.push({ row: 0, message: 'Duplicate column "' + orig + '" -> "' + headers[h] + '"' });
+    } else {
+      headerSeen.set(orig, 1);
+    }
   }
 
-  return { headers, rows: dataRows };
+  // Normalize row lengths to match header count
+  const colCount = headers.length;
+  for (let r = 0; r < dataRows.length; r++) {
+    if (dataRows[r].length < colCount) {
+      while (dataRows[r].length < colCount) dataRows[r].push('');
+    } else if (dataRows[r].length > colCount) {
+      parseErrors.push({
+        row: r + 1,
+        message: 'Row has ' + dataRows[r].length + ' fields, expected ' + colCount + '; truncated'
+      });
+      dataRows[r] = dataRows[r].slice(0, colCount);
+    }
+  }
+
+  return { headers, rows: dataRows, parseErrors };
 }
 
 function detectDelimiter(text) {
@@ -156,7 +238,7 @@ function detectDelimiter(text) {
       let count = 0;
       let inQuote = false;
       for (let i = 0; i < l.length; i++) {
-        if (l[i] === '"') inQuote = !inQuote;
+        if (isAnyQuote(l[i])) inQuote = !inQuote;
         else if (l[i] === d && !inQuote) count++;
       }
       return count;
@@ -187,6 +269,10 @@ const DATE_PATTERNS = [
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[\d\s\-+()]{7,15}$/;
 const BOOL_VALUES = new Set(['true', 'false', 'yes', 'no', '1', '0', '是', '否', 'y', 'n', 't', 'f']);
+
+// Money patterns: ¥100, $1,234.56, €100, £50, ￥100, 100元, 100万
+const MONEY_PREFIX_RE = /^[¥$€£￥]\s*-?\d[\d,，.]*\d*$/;
+const MONEY_SUFFIX_RE = /^-?\d[\d,，.]*\d*\s*[元万千百块]$/;
 
 function profileDataset(headers, rows) {
   const n = rows.length;
@@ -245,7 +331,7 @@ function profileDataset(headers, rows) {
 function profileColumn(header, colIdx, rows) {
   const n = rows.length;
   let nullCount = 0, intCount = 0, floatCount = 0, dateCount = 0;
-  let emailCount = 0, phoneCount = 0, boolCount = 0, dirtyCount = 0;
+  let emailCount = 0, phoneCount = 0, boolCount = 0, dirtyCount = 0, moneyCount = 0;
   const valueCounts = new Map();
   const sampleValues = [];
   const dirtySamples = [];
@@ -254,7 +340,7 @@ function profileColumn(header, colIdx, rows) {
     const raw = rows[r][colIdx];
     const v = raw == null ? '' : String(raw).trim();
 
-    if (v === '' || v.toLowerCase() === 'null' || v.toLowerCase() === 'na' || v === 'N/A' || v === 'n/a' || v === '-') {
+    if (v === '' || v.toLowerCase() === 'null' || v.toLowerCase() === 'na' || v === 'N/A' || v === 'n/a' || v === '-' || v.toLowerCase() === 'none' || v.toLowerCase() === 'nan' || v.toLowerCase() === 'nil') {
       nullCount++;
       continue;
     }
@@ -270,6 +356,7 @@ function profileColumn(header, colIdx, rows) {
     if (EMAIL_RE.test(v)) emailCount++;
     if (PHONE_RE.test(v) && v.replace(/\D/g, '').length >= 7) phoneCount++;
     if (BOOL_VALUES.has(v.toLowerCase()) || BOOL_VALUES.has(v)) boolCount++;
+    if (MONEY_PREFIX_RE.test(v) || MONEY_SUFFIX_RE.test(v)) moneyCount++;
 
     if ((raw !== v && raw !== undefined && raw !== null) || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(raw || '')) {
       dirtyCount++;
@@ -285,6 +372,7 @@ function profileColumn(header, colIdx, rows) {
     const candidates = [
       { type: 'integer', count: intCount },
       { type: 'float', count: floatCount },
+      { type: 'money', count: moneyCount },
       { type: 'date', count: dateCount },
       { type: 'email', count: emailCount },
       { type: 'phone', count: phoneCount },
@@ -293,7 +381,17 @@ function profileColumn(header, colIdx, rows) {
 
     if (candidates.length > 0) {
       typeConfidence = Math.round(candidates[0].count / nonNull * 100);
-      if (typeConfidence >= 50) type = candidates[0].type;
+      // Lowered threshold from 50% to 40% to catch type drift scenarios
+      if (typeConfidence >= 40) type = candidates[0].type;
+    }
+
+    // Type drift detection: if top 2 types together cover >80% but neither >60%
+    if (candidates.length >= 2) {
+      const topTwo = candidates[0].count + candidates[1].count;
+      if (topTwo / nonNull > 0.8 && candidates[0].count / nonNull < 0.6) {
+        type = 'mixed';
+        typeConfidence = Math.round(candidates[0].count / nonNull * 100);
+      }
     }
   }
 

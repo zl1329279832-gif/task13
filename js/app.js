@@ -11,9 +11,7 @@ class App {
     this.rulesPanel = new RulesPanel(this);
     this.resultsView = new ResultsView(this);
 
-    /** Undo/redo history */
-    this.history = [];
-    this.historyIdx = -1;
+    /** Max undo history per dataset */
     this.maxHistory = 50;
 
     this._initUI();
@@ -89,14 +87,33 @@ class App {
     );
     if (csvFiles.length === 0) { toast('未找到 CSV 文件', 'warning'); return; }
 
+    // Start a new task version — any in-flight parse/profile/export tasks are invalidated
+    this.worker.startNewTaskVersion();
+    const myVersion = this.worker.currentTaskVersion;
+
     showLoading(`正在解析 ${csvFiles.length} 个文件...`, 0);
 
     for (let i = 0; i < csvFiles.length; i++) {
       const file = csvFiles[i];
       try {
-        showLoading(`解析 ${file.name} (${i+1}/${csvFiles.length})...`, i / csvFiles.length);
-        const text = await readFileAsText(file);
+        // Check if a newer import was triggered while we were waiting
+        if (this.worker.currentTaskVersion !== myVersion) { hideLoading(); return; }
+
+        showLoading(`读取 ${file.name} (${i+1}/${csvFiles.length})...`, i / csvFiles.length);
+
+        // Read file with progress callback (chunked streaming)
+        const text = await readFileAsText(file, (p) => {
+          showLoading(`读取 ${file.name}...`, (i + p) / csvFiles.length);
+        });
+
+        // Re-check version after file read (could have taken seconds for large files)
+        if (this.worker.currentTaskVersion !== myVersion) { hideLoading(); return; }
+
+        showLoading(`解析 ${file.name} (${i+1}/${csvFiles.length})...`, (i + 0.5) / csvFiles.length);
         const result = await this.worker.parseCSV(text, {});
+
+        // Re-check version after worker parse
+        if (this.worker.currentTaskVersion !== myVersion) { hideLoading(); return; }
 
         const name = file.name.replace(/\.(csv|tsv|txt)$/i, '');
         let uniqueName = name;
@@ -111,10 +128,17 @@ class App {
           profile: result.profile,
           originalHeaders: result.headers.slice(),
           originalRows: result.rows.map(r => r.slice()),
+          parseErrors: result.parseErrors || [],
+          history: [],      // per-dataset undo stack
+          historyIdx: -1,   // per-dataset undo pointer
         });
 
+        if (result.parseErrors && result.parseErrors.length > 0) {
+          toast(`${uniqueName}: ${result.parseErrors.length} 个解析警告`, 'warning');
+        }
         toast(`${uniqueName}: ${fmtNum(result.rows.length)} 行 x ${result.headers.length} 列`, 'success');
       } catch (err) {
+        if (err.message === 'STALE_TASK' || err.message === 'CANCELLED') { hideLoading(); return; }
         toast(`${file.name}: ${err.message}`, 'error');
       }
     }
@@ -145,13 +169,23 @@ class App {
   }
 
   removeDataset(name) {
+    const ds = this.datasets.get(name);
+    if (ds) {
+      // Clean up per-dataset history to free memory
+      ds.history = [];
+      ds.historyIdx = -1;
+    }
     this.datasets.delete(name);
     if (this.activeDatasetName === name) {
       this.activeDatasetName = this.datasets.size > 0 ? this.datasets.keys().next().value : null;
     }
     this._renderDatasetList();
-    if (this.activeDatasetName) this._renderActiveDataset();
-    else this._showWelcome();
+    if (this.activeDatasetName) {
+      this._renderActiveDataset();
+      this._updateUndoRedoButtons();
+    } else {
+      this._showWelcome();
+    }
   }
 
   _renderDatasetList() {
@@ -180,7 +214,8 @@ class App {
         this.activeDatasetName = item.dataset.name;
         this._renderDatasetList();
         this._renderActiveDataset();
-        this._pushHistory();
+        // Don't push history on dataset switch — just update button state
+        this._updateUndoRedoButtons();
       }
     };
   }
@@ -208,6 +243,7 @@ class App {
 
     document.getElementById('btnExportCSV').disabled = false;
     document.getElementById('btnExportReport').disabled = false;
+    this._updateUndoRedoButtons();
   }
 
   /* ============================================================
@@ -276,7 +312,7 @@ class App {
   }
 
   _renderColProfile(p) {
-    const typeLabels = { integer: '整数', float: '浮点', date: '日期', email: '邮箱', phone: '电话', boolean: '布尔', string: '文本' };
+    const typeLabels = { integer: '整数', float: '浮点', money: '金额', date: '日期', email: '邮箱', phone: '电话', boolean: '布尔', mixed: '混合', string: '文本' };
     const badges = [];
     if (p.isPrimaryKey) badges.push('<span class="badge badge-pk">主键</span>');
     if (p.isEnum) badges.push('<span class="badge badge-enum">枚举</span>');
@@ -329,17 +365,31 @@ class App {
     const rules = this.rulesPanel.getRules().filter(r => r.enabled !== false);
     if (rules.length === 0) { toast('请先添加清洗规则', 'warning'); return; }
 
+    // Start a new task version — any in-flight parse tasks are invalidated
+    this.worker.startNewTaskVersion();
+    const myVersion = this.worker.currentTaskVersion;
+
     showLoading('执行清洗规则...', 0);
     const profileBefore = deepClone(ds.profile);
 
     try {
       const allDatasets = this.getAllDatasetsForWorker();
-      const result = await this.worker.executeRules(ds.headers.slice(), ds.rows.map(r => r.slice()), rules, allDatasets);
+      const result = await this.worker.executeRules(
+        ds.headers.slice(), ds.rows.map(r => r.slice()), rules, allDatasets
+      );
+
+      // Check if a new import/clean was triggered while rules were executing
+      if (this.worker.currentTaskVersion !== myVersion) { hideLoading(); return; }
 
       ds.headers = result.headers;
       ds.rows = result.rows;
 
+      showLoading('重新分析数据画像...', 0.9);
       const newProfile = await this.worker.profile(result.headers, result.rows);
+
+      // Check version again after profile re-computation
+      if (this.worker.currentTaskVersion !== myVersion) { hideLoading(); return; }
+
       ds.profile = newProfile.profile;
 
       hideLoading();
@@ -349,60 +399,67 @@ class App {
       this._pushHistory();
       this._renderActiveDataset();
 
-      toast(`清洗完成! 质量 ${profileBefore.quality} -> ${ds.profile.quality}`, ds.profile.quality >= profileBefore.quality ? 'success' : 'warning');
+      toast(`清洗完成! 质量 ${profileBefore.quality} -> ${ds.profile.quality}`,
+        ds.profile.quality >= profileBefore.quality ? 'success' : 'warning');
     } catch (err) {
       hideLoading();
+      if (err.message === 'STALE_TASK' || err.message === 'CANCELLED') return;
       toast('执行失败: ' + err.message, 'error');
     }
   }
 
   /* ============================================================
-     Undo / Redo
+     Undo / Redo (per-dataset history stacks)
      ============================================================ */
   _pushHistory() {
     const ds = this.getActiveDataset();
     if (!ds) return;
 
-    if (this.historyIdx < this.history.length - 1) {
-      this.history = this.history.slice(0, this.historyIdx + 1);
+    // Initialize per-dataset history if needed
+    if (!ds.history) ds.history = [];
+    if (ds.historyIdx == null) ds.historyIdx = -1;
+
+    // If we undid some steps and now push, truncate the "future" entries
+    if (ds.historyIdx < ds.history.length - 1) {
+      ds.history = ds.history.slice(0, ds.historyIdx + 1);
     }
 
-    this.history.push({
-      datasetName: this.activeDatasetName,
+    ds.history.push({
       headers: ds.headers.slice(),
       rows: ds.rows.map(r => r.slice()),
       profile: deepClone(ds.profile),
       rulesSnapshot: deepClone(this.rulesPanel.getRules()),
     });
 
-    if (this.history.length > this.maxHistory) this.history.shift();
-    this.historyIdx = this.history.length - 1;
+    if (ds.history.length > this.maxHistory) ds.history.shift();
+    ds.historyIdx = ds.history.length - 1;
     this._updateUndoRedoButtons();
   }
 
   undo() {
-    if (this.historyIdx <= 0) return;
-    this.historyIdx--;
+    const ds = this.getActiveDataset();
+    if (!ds || !ds.history || ds.historyIdx <= 0) return;
+    ds.historyIdx--;
     this._restoreHistory();
   }
 
   redo() {
-    if (this.historyIdx >= this.history.length - 1) return;
-    this.historyIdx++;
+    const ds = this.getActiveDataset();
+    if (!ds || !ds.history || ds.historyIdx >= ds.history.length - 1) return;
+    ds.historyIdx++;
     this._restoreHistory();
   }
 
   _restoreHistory() {
-    const snap = this.history[this.historyIdx];
+    const ds = this.getActiveDataset();
+    if (!ds || !ds.history) return;
+    const snap = ds.history[ds.historyIdx];
     if (!snap) return;
 
-    this.activeDatasetName = snap.datasetName;
-    const ds = this.datasets.get(snap.datasetName);
-    if (ds) {
-      ds.headers = snap.headers.slice();
-      ds.rows = snap.rows.map(r => r.slice());
-      ds.profile = deepClone(snap.profile);
-    }
+    // Restore into the CURRENT dataset only — never switch datasets
+    ds.headers = snap.headers.slice();
+    ds.rows = snap.rows.map(r => r.slice());
+    ds.profile = deepClone(snap.profile);
 
     this.rulesPanel.setRules(snap.rulesSnapshot);
     this._renderDatasetList();
@@ -411,8 +468,16 @@ class App {
   }
 
   _updateUndoRedoButtons() {
-    document.getElementById('btnUndo').disabled = this.historyIdx <= 0;
-    document.getElementById('btnRedo').disabled = this.historyIdx >= this.history.length - 1;
+    const ds = this.getActiveDataset();
+    const btnUndo = document.getElementById('btnUndo');
+    const btnRedo = document.getElementById('btnRedo');
+    if (!ds || !ds.history || ds.history.length === 0) {
+      btnUndo.disabled = true;
+      btnRedo.disabled = true;
+      return;
+    }
+    btnUndo.disabled = (ds.historyIdx <= 0);
+    btnRedo.disabled = (ds.historyIdx >= ds.history.length - 1);
   }
 
   /* ============================================================
@@ -429,7 +494,11 @@ class App {
       await store.saveRules(id, name, rules);
       toast(`规则已保存: ${name}`, 'success');
     } catch (err) {
-      toast('保存失败: ' + err.message, 'error');
+      if (store._memoryStore.has(id)) {
+        toast(`规则已暂存到内存 (IndexedDB 不可用): ${name}`, 'warning');
+      } else {
+        toast('保存失败: ' + err.message, 'error');
+      }
     }
   }
 
@@ -508,6 +577,15 @@ class App {
 
 /* Boot */
 (async function init() {
-  try { await store.open(); } catch (e) { console.warn('IndexedDB init failed:', e); }
+  try {
+    await store.open();
+    if (!store.dbAvailable) {
+      // Defer toast until after App constructor builds the toast container
+      setTimeout(() => toast('IndexedDB 不可用，规则将仅在内存中保存', 'warning', 5000), 100);
+    }
+  } catch (e) {
+    console.warn('IndexedDB init failed:', e);
+    setTimeout(() => toast('存储初始化失败，使用内存模式', 'warning', 5000), 100);
+  }
   window.app = new App();
 })();

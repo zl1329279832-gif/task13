@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV 测试数据生成器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fa;
+      color: #2c3e50;
+      padding: 24px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .subtitle { color: #7f8c8d; margin-bottom: 24px; font-size: 14px; }
+    .gen-card {
+      background: #fff;
+      border: 1px solid #e2e6ea;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .gen-card h3 { font-size: 16px; margin-bottom: 6px; }
+    .gen-card .desc { color: #7f8c8d; font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+    .gen-card .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .gen-card label { font-size: 13px; color: #555; }
+    .gen-card input[type=number] {
+      width: 120px; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
+    }
+    .gen-card button {
+      padding: 8px 18px; border: none; border-radius: 4px; font-size: 13px; font-weight: 600;
+      background: #3498db; color: #fff; cursor: pointer;
+    }
+    .gen-card button:hover { background: #2980b9; }
+    .gen-card button:active { background: #1c6ea4; }
+    .gen-card .meta { font-size: 12px; color: #95a5a6; margin-left: 8px; }
+    #output {
+      background: #fff; border: 1px solid #e2e6ea; border-radius: 8px;
+      padding: 16px; margin-top: 16px; font-family: monospace; font-size: 12px;
+      max-height: 300px; overflow-y: auto; white-space: pre-wrap;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>CSV 测试数据生成器</h1>
+  <p class="subtitle">生成各种边界情况的 CSV 文件，用于验证 CSV 清洗工具的健壮性</p>
+
+  <!-- 1: Large file -->
+  <div class="gen-card">
+    <h3>1. 百万行基准测试</h3>
+    <div class="desc">干净 CSV，7 列（id, name, email, amount, date, category, status），用于测试解析性能</div>
+    <div class="controls">
+      <label>行数: <input type="number" id="largeRows" value="1000000" min="1000" max="5000000" step="100000"></label>
+      <button onclick="runGenerator('large')">生成并下载</button>
+      <span class="meta" id="largeMeta"></span>
+    </div>
+  </div>
+
+  <!-- 2: Malformed -->
+  <div class="gen-card">
+    <h3>2. 异常格式行</h3>
+    <div class="desc">15 条精心构造的坏行：智能引号、未关闭引号、多余/缺少字段、控制字符、混合引号风格、空行穿插</div>
+    <div class="controls">
+      <button onclick="runGenerator('malformed')">生成并下载</button>
+      <span class="meta" id="malformedMeta"></span>
+    </div>
+  </div>
+
+  <!-- 3: Duplicate columns -->
+  <div class="gen-card">
+    <h3>3. 重复列名</h3>
+    <div class="desc">表头: id, name, amount, name, category, amount, status — 包含重复的 name 和 amount 列</div>
+    <div class="controls">
+      <label>行数: <input type="number" id="dupColRows" value="5" min="1" max="1000"></label>
+      <button onclick="runGenerator('dupCols')">生成并下载</button>
+      <span class="meta" id="dupColsMeta"></span>
+    </div>
+  </div>
+
+  <!-- 4: Type drift -->
+  <div class="gen-card">
+    <h3>4. 类型漂移</h3>
+    <div class="desc">value 列从整数(前30%)→浮点(中40%)→字符串(后30%)渐变，amount 列类似漂移</div>
+    <div class="controls">
+      <label>行数: <input type="number" id="driftRows" value="10000" min="100" max="100000" step="1000"></label>
+      <button onclick="runGenerator('drift')">生成并下载</button>
+      <span class="meta" id="driftMeta"></span>
+    </div>
+  </div>
+
+  <!-- 5: Null variants -->
+  <div class="gen-card">
+    <h3>5. 空值变体</h3>
+    <div class="desc">循环使用 11 种空值表示：空字符串, NULL, null, NA, N/A, n/a, -, 空格, nil, None, NaN</div>
+    <div class="controls">
+      <label>行数: <input type="number" id="nullRows" value="200" min="10" max="10000"></label>
+      <button onclick="runGenerator('nulls')">生成并下载</button>
+      <span class="meta" id="nullsMeta"></span>
+    </div>
+  </div>
+
+  <!-- 6: Dirty data -->
+  <div class="gen-card">
+    <h3>6. 脏数据</h3>
+    <div class="desc">前导/尾随空白、制表符、控制字符(\x01, \x0B, \x0C)、全角空格混入各字段</div>
+    <div class="controls">
+      <label>行数: <input type="number" id="dirtyRows" value="500" min="10" max="10000"></label>
+      <button onclick="runGenerator('dirty')">生成并下载</button>
+      <span class="meta" id="dirtyMeta"></span>
+    </div>
+  </div>
+
+  <!-- 7: Kitchen sink -->
+  <div class="gen-card">
+    <h3>7. 综合压力测试（厨房水槽）</h3>
+    <div class="desc">所有问题综合：脏空白(每行)、类型漂移、无效日期(每10行)、空值(每7行)、未关闭引号(每1000行)、智能引号(每2000行)、多余列(每3000行)、缺少列(每5000行)</div>
+    <div class="controls">
+      <label>行数: <input type="number" id="sinkRows" value="50000" min="1000" max="200000" step="5000"></label>
+      <button onclick="runGenerator('sink')">生成并下载</button>
+      <span class="meta" id="sinkMeta"></span>
+    </div>
+  </div>
+
+  <div id="output"></div>
+
+  <script src="js/test-generator.js"></script>
+</body>
+</html>

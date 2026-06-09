@@ -69,13 +69,49 @@ function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function readFileAsText(file) {
+function readFileAsText(file, onProgress) {
+  // Use streaming reader if file.stream() is available (modern browsers)
+  if (typeof file.stream === 'function') {
+    return _readFileChunked(file, onProgress);
+  }
+  // Fallback: read entire file with FileReader + progress events
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+    reader.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+    };
+    reader.onload = () => {
+      if (onProgress) onProgress(1);
+      resolve(reader.result);
+    };
     reader.onerror = () => reject(new Error('Failed to read file: ' + file.name));
     reader.readAsText(file, 'UTF-8');
   });
+}
+
+async function _readFileChunked(file, onProgress) {
+  const reader = file.stream().getReader();
+  // stream:true makes TextDecoder buffer incomplete multi-byte UTF-8
+  // sequences at chunk boundaries instead of emitting replacement chars
+  const decoder = new TextDecoder('utf-8');
+  const totalSize = file.size;
+  let received = 0;
+  let result = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      result += decoder.decode(value, { stream: true });
+      if (onProgress) onProgress(received / totalSize);
+    }
+    // Flush any remaining buffered bytes (partial multi-byte chars)
+    result += decoder.decode();
+  } catch (err) {
+    throw new Error('Failed to read file: ' + err.message);
+  }
+  if (onProgress) onProgress(1);
+  return result;
 }
 
 function debounce(fn, ms) {
