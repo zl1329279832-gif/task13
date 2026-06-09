@@ -144,6 +144,8 @@ class App {
           parseErrors: result.parseErrors || [],
           history: [],      // per-dataset undo stack
           historyIdx: -1,   // per-dataset undo pointer
+          fingerprints: null,    // cached column fingerprints (lazy)
+          datasetHash: null,     // identity hash for staleness detection
         });
 
         if (result.parseErrors && result.parseErrors.length > 0) {
@@ -224,6 +226,9 @@ class App {
       }
       const item = e.target.closest('.dataset-item');
       if (item) {
+        // Bump dataset version to invalidate any in-flight async operations
+        // (fingerprint computations, match operations) for the previous dataset
+        this.worker.bumpDatasetVersion();
         this.activeDatasetName = item.dataset.name;
         this._renderDatasetList();
         this._renderActiveDataset();
@@ -404,6 +409,9 @@ class App {
       if (this.worker.currentTaskVersion !== myVersion) { hideLoading(); return; }
 
       ds.profile = newProfile.profile;
+      // Invalidate cached fingerprints since headers/rows changed
+      ds.fingerprints = null;
+      ds.datasetHash = null;
 
       hideLoading();
 
@@ -443,6 +451,7 @@ class App {
       rows: ds.rows.map(r => r.slice()),
       profile: deepClone(ds.profile),
       rulesSnapshot: deepClone(this.rulesPanel.getRules()),
+      datasetName: ds.name,  // identity tag for cross-dataset safety
     });
 
     if (ds.history.length > this.maxHistory) ds.history.shift();
@@ -470,10 +479,21 @@ class App {
     const snap = ds.history[ds.historyIdx];
     if (!snap) return;
 
+    // Cross-dataset safety: verify this snapshot belongs to the current dataset
+    if (snap.datasetName && snap.datasetName !== ds.name) {
+      console.warn('History snapshot dataset mismatch:', snap.datasetName, 'vs', ds.name);
+      toast('撤销/重做数据不匹配当前数据集，已跳过', 'warning');
+      return;
+    }
+
     // Restore into the CURRENT dataset only — never switch datasets
     ds.headers = snap.headers.slice();
     ds.rows = snap.rows.map(r => r.slice());
     ds.profile = deepClone(snap.profile);
+
+    // Invalidate cached fingerprints since data changed
+    ds.fingerprints = null;
+    ds.datasetHash = null;
 
     this.rulesPanel.setRules(snap.rulesSnapshot);
     this._renderDatasetList();
@@ -563,6 +583,28 @@ class App {
   /* ============================================================
      Recipe Capture
      ============================================================ */
+  /**
+   * Compute and cache fingerprints for a dataset.
+   * Returns the cached fingerprints if already computed.
+   * This prevents redundant worker calls and ensures fingerprints
+   * are consistent with the dataset at the time of computation.
+   */
+  async _ensureFingerprints(ds) {
+    if (ds.fingerprints && ds.datasetHash) {
+      return { fingerprints: ds.fingerprints, datasetHash: ds.datasetHash };
+    }
+
+    const fpResult = await this.worker.computeFingerprints(
+      ds.originalHeaders || ds.headers,
+      ds.originalRows || ds.rows,
+      ds.profile
+    );
+
+    ds.fingerprints = fpResult.fingerprints;
+    ds.datasetHash = fpResult.datasetHash || null;
+    return { fingerprints: ds.fingerprints, datasetHash: ds.datasetHash };
+  }
+
   async captureRecipe() {
     const ds = this.getActiveDataset();
     if (!ds) { toast('请先导入数据', 'warning'); return null; }
@@ -572,13 +614,7 @@ class App {
 
     showLoading('正在生成列指纹...');
     try {
-      const fpResult = await this.worker.computeFingerprints(
-        ds.originalHeaders || ds.headers,
-        ds.originalRows || ds.rows,
-        ds.profile
-      );
-
-      const fingerprints = fpResult.fingerprints;
+      const { fingerprints, datasetHash } = await this._ensureFingerprints(ds);
 
       // Build recipe steps from current rules
       const steps = rules.map((rule, idx) => {
@@ -603,6 +639,7 @@ class App {
         sourceInfo: {
           headers: (ds.originalHeaders || ds.headers).slice(),
           fingerprints,
+          datasetHash,
           rowCount: ds.originalRows ? ds.originalRows.length : ds.rows.length,
           columnCount: (ds.originalHeaders || ds.headers).length,
           qualityScore: ds.profile ? ds.profile.quality : 0,
@@ -614,6 +651,10 @@ class App {
       return recipe;
     } catch (err) {
       hideLoading();
+      if (err.message === 'STALE_TASK' || err.message === 'CANCELLED') {
+        toast('操作已取消（数据集已切换）', 'warning');
+        return null;
+      }
       toast('生成方案失败: ' + err.message, 'error');
       return null;
     }
@@ -709,13 +750,30 @@ class App {
       if (data.type === 'recipe' && data.recipe) {
         recipe = data.recipe;
       } else if (data.type === 'recipes' && Array.isArray(data.recipes)) {
-        // Import multiple recipes
+        // Import multiple recipes — validate each
+        const valid = [];
         for (const r of data.recipes) {
+          const warnings = this._validateRecipeStructure(r);
+          if (warnings.length > 0) {
+            console.warn('Skipping invalid recipe:', r.name || '?', warnings);
+            continue;
+          }
+          valid.push(r);
+        }
+        if (valid.length === 0) {
+          toast('导入失败: 文件中没有有效的方案', 'error');
+          return;
+        }
+        for (const r of valid) {
           r.id = r.name.replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '_') + '_' + uid();
           r.updatedAt = Date.now();
           await store.saveRecipe(r);
         }
-        toast('已导入 ' + data.recipes.length + ' 个方案', 'success');
+        if (valid.length < data.recipes.length) {
+          toast(`已导入 ${valid.length}/${data.recipes.length} 个方案 (${data.recipes.length - valid.length} 个无效已跳过)`, 'warning');
+        } else {
+          toast('已导入 ' + valid.length + ' 个方案', 'success');
+        }
         this.switchTab('recipes');
         this.recipePanel.render();
         return;
@@ -724,6 +782,29 @@ class App {
       }
 
       if (!recipe) { toast('无效的 JSON 格式', 'error'); return; }
+
+      // Structural validation
+      const warnings = this._validateRecipeStructure(recipe);
+      if (warnings.length > 0) {
+        const proceed = confirm(
+          '方案结构验证发现以下问题:\n' + warnings.join('\n') +
+          '\n\n仍然导入？（可能导致应用时出错）'
+        );
+        if (!proceed) return;
+      }
+
+      // Compatibility check with active dataset
+      const ds = this.getActiveDataset();
+      if (ds && recipe.sourceInfo) {
+        const compatWarnings = this._checkRecipeCompatibility(recipe, ds);
+        if (compatWarnings.length > 0) {
+          const proceed = confirm(
+            '方案与当前数据集可能存在兼容性问题:\n' + compatWarnings.join('\n') +
+            '\n\n仍然导入？（应用时需手动调整列映射）'
+          );
+          if (!proceed) return;
+        }
+      }
 
       recipe.id = recipe.name.replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '_') + '_' + uid();
       recipe.updatedAt = Date.now();
@@ -734,6 +815,82 @@ class App {
     } catch (err) {
       toast('导入失败: ' + err.message, 'error');
     }
+  }
+
+  /**
+   * Validate recipe structural integrity.
+   * Returns array of warning strings (empty = valid).
+   */
+  _validateRecipeStructure(recipe) {
+    const warnings = [];
+    if (!recipe || typeof recipe !== 'object') {
+      warnings.push('方案不是有效的对象');
+      return warnings;
+    }
+    if (!recipe.name || typeof recipe.name !== 'string') {
+      warnings.push('缺少方案名称 (name)');
+    }
+    if (!Array.isArray(recipe.steps)) {
+      warnings.push('缺少步骤列表 (steps)');
+      return warnings;
+    }
+    if (recipe.steps.length === 0) {
+      warnings.push('步骤列表为空');
+    }
+    for (let i = 0; i < recipe.steps.length; i++) {
+      const step = recipe.steps[i];
+      if (!step.ruleType) warnings.push(`步骤 ${i + 1}: 缺少 ruleType`);
+      if (!step.config) warnings.push(`步骤 ${i + 1}: 缺少 config`);
+      if (step.ruleType && !RULE_META[step.ruleType]) {
+        warnings.push(`步骤 ${i + 1}: 未知规则类型 "${step.ruleType}"`);
+      }
+    }
+    if (recipe.sourceInfo) {
+      if (!Array.isArray(recipe.sourceInfo.fingerprints)) {
+        warnings.push('sourceInfo.fingerprints 不是数组');
+      }
+      if (!Array.isArray(recipe.sourceInfo.headers)) {
+        warnings.push('sourceInfo.headers 不是数组');
+      }
+    } else {
+      warnings.push('缺少 sourceInfo（列指纹信息），应用时无法自动匹配列');
+    }
+    return warnings;
+  }
+
+  /**
+   * Check recipe compatibility with a target dataset.
+   * Returns array of warning strings (empty = compatible).
+   */
+  _checkRecipeCompatibility(recipe, ds) {
+    const warnings = [];
+    const srcInfo = recipe.sourceInfo;
+
+    if (srcInfo.columnCount && ds.headers.length !== srcInfo.columnCount) {
+      const diff = Math.abs(ds.headers.length - srcInfo.columnCount);
+      if (diff > 2) {
+        warnings.push(
+          `列数差异较大: 方案来源 ${srcInfo.columnCount} 列 vs 当前 ${ds.headers.length} 列`
+        );
+      }
+    }
+
+    if (srcInfo.datasetHash && ds.datasetHash && srcInfo.datasetHash !== ds.datasetHash) {
+      warnings.push('数据集身份哈希不匹配，方案来自不同的数据集');
+    }
+
+    // Check if source headers exist in target
+    if (srcInfo.headers && srcInfo.headers.length > 0) {
+      const targetSet = new Set(ds.headers);
+      const missing = srcInfo.headers.filter(h => !targetSet.has(h));
+      if (missing.length > 0 && missing.length <= srcInfo.headers.length * 0.5) {
+        warnings.push(
+          `${missing.length} 个来源列在当前数据集中不存在: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '...' : ''}`
+        );
+      }
+    }
+
+    return warnings;
   }
 
   /* ============================================================

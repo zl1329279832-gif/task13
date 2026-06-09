@@ -50,7 +50,8 @@ self.onmessage = function (e) {
       }
       case 'computeFingerprints': {
         const fps = buildFingerprints(payload.headers, payload.rows, payload.profile);
-        send({ success: true, fingerprints: fps });
+        const datasetHash = computeDatasetHash(payload.headers, payload.rows.length);
+        send({ success: true, fingerprints: fps, datasetHash });
         break;
       }
       case 'matchFingerprints': {
@@ -58,7 +59,8 @@ self.onmessage = function (e) {
           payload.sourceFingerprints, payload.targetHeaders,
           payload.targetRows, payload.targetProfile
         );
-        send({ success: true, ...matchResult });
+        const targetDatasetHash = computeDatasetHash(payload.targetHeaders, payload.targetRows.length);
+        send({ success: true, ...matchResult, targetDatasetHash });
         break;
       }
       default:
@@ -895,6 +897,23 @@ function hashCode(str) {
     hash |= 0;
   }
   return Math.abs(hash).toString(36).slice(0, 6);
+}
+
+/**
+ * Compute a lightweight dataset identity hash from headers and row count.
+ * Used to verify that fingerprints/matches belong to the correct dataset
+ * when the user switches files rapidly.
+ */
+function computeDatasetHash(headers, rowCount) {
+  // Combine header names (in order) + row count into a short hash string
+  const headerSig = headers.join('|');
+  const raw = headerSig + '::' + rowCount;
+  let h = 0;
+  for (let i = 0; i < raw.length; i++) {
+    h = ((h << 5) - h) + raw.charCodeAt(i);
+    h |= 0;
+  }
+  return 'ds_' + Math.abs(h).toString(36).slice(0, 8) + '_' + rowCount;
 }
 
 /* --- Matching --- */

@@ -16,6 +16,8 @@ class RecipePanel {
     this._pendingMappings = null;
     this._columnMap = null;
     this._currentStepMode = 'all'; // 'all' or 'step'
+    this._replayDatasetVersion = 0;  // dataset version at recipe prepare time
+    this._replayDatasetName = null;  // dataset name at recipe prepare time
 
     this.modalCancel.addEventListener('click', () => this._hideModal());
     this.modalCloseBtn.addEventListener('click', () => this._hideModal());
@@ -106,6 +108,10 @@ class RecipePanel {
     const recipe = await store.getRecipe(id);
     if (!recipe) { toast('方案不存在', 'error'); return; }
 
+    // Capture dataset version before async operation
+    const datasetVersionBefore = this.app.worker.currentDatasetVersion;
+    const dsNameBefore = this.app.activeDatasetName;
+
     showLoading('正在分析列匹配...');
     try {
       const matchResult = await this.app.worker.matchFingerprints(
@@ -113,9 +119,28 @@ class RecipePanel {
         ds.headers, ds.rows, ds.profile
       );
       hideLoading();
+
+      // Verify dataset hasn't changed during async match
+      if (this.app.worker.currentDatasetVersion !== datasetVersionBefore ||
+          this.app.activeDatasetName !== dsNameBefore) {
+        toast('数据集已切换，请重新应用方案', 'warning');
+        return;
+      }
+
+      // Verify match result is for the current dataset (hash check)
+      if (matchResult.targetDatasetHash && ds.datasetHash &&
+          matchResult.targetDatasetHash !== ds.datasetHash) {
+        toast('列匹配结果与当前数据集不一致，请重新应用', 'warning');
+        return;
+      }
+
       this._showMatchModal(recipe, matchResult);
     } catch (err) {
       hideLoading();
+      if (err.message === 'STALE_TASK' || err.message === 'CANCELLED') {
+        toast('操作已取消（数据集已切换）', 'warning');
+        return;
+      }
       toast('列匹配失败: ' + err.message, 'error');
     }
   }
@@ -128,7 +153,28 @@ class RecipePanel {
     const confColor = matchResult.overallConfidence >= 80 ? 'var(--success)' :
                       matchResult.overallConfidence >= 50 ? 'var(--warning)' : 'var(--danger)';
 
+    // Count problematic mappings
+    const unmatchedCount = matchResult.mappings.filter(m => m.status === 'unmatched').length;
+    const ambiguousCount = matchResult.mappings.filter(m => m.status === 'ambiguous').length;
+    const conflictCount = conflicts.length;
+
+    // Build warning banner for low confidence / compatibility issues
+    let warningBanner = '';
+    if (matchResult.overallConfidence < 50) {
+      warningBanner += `<div class="match-warning-banner" style="background:rgba(231,76,60,0.12);border:1px solid var(--danger);border-radius:6px;padding:8px 12px;margin-bottom:10px;color:var(--danger)">
+        <strong>⚠ 低匹配置信度 (${matchResult.overallConfidence}%)</strong> —
+        该方案可能来自结构不同的数据集。请仔细核对列映射，或选择"跳过无法匹配的步骤"。
+      </div>`;
+    } else if (unmatchedCount > 2 || ambiguousCount > 2 || conflictCount > 0) {
+      warningBanner += `<div class="match-warning-banner" style="background:rgba(243,156,18,0.12);border:1px solid var(--warning);border-radius:6px;padding:8px 12px;margin-bottom:10px;color:var(--warning)">
+        <strong>⚠ 部分列映射需要确认</strong> —
+        ${unmatchedCount > 0 ? unmatchedCount + ' 列未匹配, ' : ''}${ambiguousCount > 0 ? ambiguousCount + ' 列待确认, ' : ''}${conflictCount > 0 ? conflictCount + ' 个冲突' : ''}。
+        请手动调整映射后再执行。
+      </div>`;
+    }
+
     let html = `<div class="match-preview">
+      ${warningBanner}
       <div class="match-overall">
         <span>整体匹配置信度:</span>
         <span class="match-overall-score" style="color:${confColor};font-weight:700">${matchResult.overallConfidence}%</span>
@@ -237,6 +283,10 @@ class RecipePanel {
   _showStepPreview(colMap, skipUnmatched, skipConflicting) {
     const recipe = this._pendingRecipe;
 
+    // Capture dataset version for replay safety — will be checked before each step
+    this._replayDatasetVersion = this.app.worker.currentDatasetVersion;
+    this._replayDatasetName = this.app.activeDatasetName;
+
     // Build column map by name (fpId -> targetName, then build name->name)
     const nameMap = new Map();
     for (const fp of recipe.sourceInfo.fingerprints) {
@@ -311,6 +361,13 @@ class RecipePanel {
     const ds = this.app.getActiveDataset();
     if (!ds) return;
 
+    // Verify dataset hasn't changed since recipe was prepared
+    if (this.app.worker.currentDatasetVersion !== this._replayDatasetVersion ||
+        this.app.activeDatasetName !== this._replayDatasetName) {
+      toast('数据集已切换，请重新应用方案', 'warning');
+      return;
+    }
+
     // Push pre-replay history anchor
     this.app._pushHistory();
 
@@ -339,6 +396,14 @@ class RecipePanel {
 
   async _replayNextStep() {
     const replay = this.app.recipeReplay;
+
+    // Verify dataset hasn't changed since recipe was prepared
+    if (this.app.worker.currentDatasetVersion !== this._replayDatasetVersion ||
+        this.app.activeDatasetName !== this._replayDatasetName) {
+      toast('数据集已切换，方案执行已取消', 'warning');
+      return;
+    }
+
     if (replay.state === 'idle' || replay.state === 'ready') {
       this.app._pushHistory();
     }

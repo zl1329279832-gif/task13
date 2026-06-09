@@ -222,14 +222,17 @@ class Store {
 
   async listRecipes() {
     if (!this.dbAvailable) {
-      return [...this._recipeMemoryStore.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      return [...this._recipeMemoryStore.values()]
+        .filter(r => this._validateRecipe(r))
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     }
     try {
       return await new Promise((resolve, reject) => {
         const tx = this._safeTransaction('recipes', 'readonly');
         const req = tx.objectStore('recipes').getAll();
         req.onsuccess = () => {
-          const results = req.result || [];
+          const results = (req.result || [])
+            .filter(r => this._validateRecipe(r));
           this._recipeMemoryStore.clear();
           for (const r of results) this._recipeMemoryStore.set(r.id, r);
           resolve(results.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
@@ -237,22 +240,80 @@ class Store {
         tx.onerror = () => reject(new Error('Failed to list recipes'));
       });
     } catch (err) {
-      return [...this._recipeMemoryStore.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      return [...this._recipeMemoryStore.values()]
+        .filter(r => this._validateRecipe(r))
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     }
   }
 
   async getRecipe(id) {
-    if (!this.dbAvailable) return this._recipeMemoryStore.get(id) || null;
+    if (!this.dbAvailable) {
+      const r = this._recipeMemoryStore.get(id);
+      return r && this._validateRecipe(r) ? r : null;
+    }
     try {
       return await new Promise((resolve, reject) => {
         const tx = this._safeTransaction('recipes', 'readonly');
         const req = tx.objectStore('recipes').get(id);
-        req.onsuccess = () => resolve(req.result || null);
+        req.onsuccess = () => {
+          const recipe = req.result || null;
+          if (recipe && !this._validateRecipe(recipe)) {
+            resolve(null);
+          } else {
+            resolve(recipe);
+          }
+        };
         tx.onerror = () => reject(new Error('Failed to get recipe'));
       });
     } catch (err) {
-      return this._recipeMemoryStore.get(id) || null;
+      const r = this._recipeMemoryStore.get(id);
+      return r && this._validateRecipe(r) ? r : null;
     }
+  }
+
+  /**
+   * Validate recipe structural integrity.
+   * Returns true if the recipe is usable, false if it should be rejected.
+   * Logs warnings for minor issues.
+   */
+  _validateRecipe(recipe) {
+    if (!recipe || typeof recipe !== 'object') {
+      console.warn('Store: recipe is not an object', recipe);
+      return false;
+    }
+    if (!recipe.id || typeof recipe.id !== 'string') {
+      console.warn('Store: recipe missing valid id', recipe);
+      return false;
+    }
+    if (!recipe.name || typeof recipe.name !== 'string') {
+      console.warn('Store: recipe', recipe.id, 'missing name');
+      return false;
+    }
+    if (!Array.isArray(recipe.steps)) {
+      console.warn('Store: recipe', recipe.id, 'missing steps array');
+      return false;
+    }
+    if (recipe.steps.length === 0) {
+      console.warn('Store: recipe', recipe.id, 'has empty steps');
+      // Allow empty steps — recipe is valid but does nothing
+    }
+    // Validate individual steps
+    for (let i = 0; i < recipe.steps.length; i++) {
+      const step = recipe.steps[i];
+      if (!step || typeof step !== 'object') {
+        console.warn('Store: recipe', recipe.id, 'step', i, 'is not an object');
+        return false;
+      }
+      if (!step.ruleType) {
+        console.warn('Store: recipe', recipe.id, 'step', i, 'missing ruleType');
+        // Don't reject — just warn. The step will be skipped at execution time.
+      }
+    }
+    // sourceInfo is optional but recommended
+    if (!recipe.sourceInfo) {
+      console.warn('Store: recipe', recipe.id, 'missing sourceInfo (no fingerprint data)');
+    }
+    return true;
   }
 
   async deleteRecipe(id) {

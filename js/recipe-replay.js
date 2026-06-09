@@ -10,6 +10,8 @@ class RecipeReplayEngine {
     this.stepResults = [];
     this._resumeResolve = null;
     this._cancelled = false;
+    this._datasetVersion = 0;   // dataset version at prepare time
+    this._datasetName = null;   // dataset name at prepare time
   }
 
   /**
@@ -24,6 +26,10 @@ class RecipeReplayEngine {
     this.stepResults = [];
     this.currentStepIdx = -1;
     this._cancelled = false;
+
+    // Capture dataset version for staleness detection during replay
+    this._datasetVersion = this.app.worker.currentDatasetVersion;
+    this._datasetName = this.app.activeDatasetName;
 
     this.resolvedSteps = recipe.steps.map((step, idx) => {
       const resolved = deepClone(step);
@@ -162,6 +168,19 @@ class RecipeReplayEngine {
     const ds = this.app.getActiveDataset();
     if (!ds) return { index: stepIdx, status: 'error', error: 'No active dataset' };
 
+    // Dataset version check: if the user switched datasets since prepare(),
+    // this step would apply transforms to the wrong data — abort.
+    if (this.app.worker.currentDatasetVersion !== this._datasetVersion ||
+        this.app.activeDatasetName !== this._datasetName) {
+      return {
+        index: stepIdx, status: 'cancelled', error: 'STALE_TASK',
+        affectedCount: 0, changes: [],
+        qualityBefore: ds.profile ? ds.profile.quality : 0,
+        qualityAfter: ds.profile ? ds.profile.quality : 0,
+        qualityDelta: 0,
+      };
+    }
+
     // Handle skipped steps
     if (step._skipReason) {
       return {
@@ -183,9 +202,23 @@ class RecipeReplayEngine {
         this.app.getAllDatasetsForWorker()
       );
 
+      // Verify dataset version again after async worker call
+      if (this.app.worker.currentDatasetVersion !== this._datasetVersion ||
+          this.app.activeDatasetName !== this._datasetName) {
+        return {
+          index: stepIdx, status: 'cancelled', error: 'STALE_TASK',
+          affectedCount: 0, changes: [],
+          qualityBefore, qualityAfter: qualityBefore, qualityDelta: 0,
+        };
+      }
+
       ds.headers = result.headers;
       ds.rows = result.rows;
       ds.profile = result.profileAfter;
+
+      // Invalidate cached fingerprints since data changed
+      ds.fingerprints = null;
+      ds.datasetHash = null;
 
       return {
         index: stepIdx,
