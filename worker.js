@@ -30,6 +30,37 @@ self.onmessage = function (e) {
         send({ success: true, result });
         break;
       }
+      case 'executeRecipeStep': {
+        const { headers: sh, rows: sr, stepConfig, allDatasets } = payload;
+        let h = sh.slice();
+        let r = sr.map(row => row.slice());
+        const stepResult = executeOneRule(h, r, stepConfig, allDatasets);
+        if (stepResult.headers) h = stepResult.headers;
+        if (stepResult.rows) r = stepResult.rows;
+        const stepProfile = profileDataset(h, r);
+        send({
+          success: true, headers: h, rows: r,
+          affectedCount: stepResult.affectedCount || 0,
+          affectedRows: (stepResult.affectedRows || []).slice(0, 500),
+          changes: (stepResult.changes || []).slice(0, 200),
+          error: stepResult.error || null,
+          profileAfter: stepProfile,
+        });
+        break;
+      }
+      case 'computeFingerprints': {
+        const fps = buildFingerprints(payload.headers, payload.rows, payload.profile);
+        send({ success: true, fingerprints: fps });
+        break;
+      }
+      case 'matchFingerprints': {
+        const matchResult = matchFingerprints(
+          payload.sourceFingerprints, payload.targetHeaders,
+          payload.targetRows, payload.targetProfile
+        );
+        send({ success: true, ...matchResult });
+        break;
+      }
       default:
         send({ success: false, error: 'Unknown task: ' + task });
     }
@@ -764,4 +795,343 @@ function crossValidate(datasets, rules) {
     results.push({ rule, ...res });
   }
   return results;
+}
+
+/* ============================================================
+   FINGERPRINT ENGINE — column matching across datasets
+   ============================================================ */
+
+const CN_EN_MAP = {
+  '订单号': ['order_id', 'orderid', 'order_no'],
+  '订单编号': ['order_id', 'orderid'],
+  '金额': ['amount', 'price', 'money'],
+  '金额(元)': ['amount', 'price'],
+  '日期': ['date', 'time'],
+  '下单日期': ['order_date', 'date'],
+  '客户': ['customer', 'client'],
+  '客户名': ['customer_name', 'customer'],
+  '状态': ['status', 'state'],
+  '数量': ['quantity', 'qty', 'count'],
+  '名称': ['name', 'title'],
+  '地址': ['address', 'addr'],
+  '电话': ['phone', 'tel', 'telephone'],
+  '邮箱': ['email', 'mail'],
+  '姓名': ['name', 'fullname'],
+  '性别': ['gender', 'sex'],
+  '年龄': ['age'],
+  '备注': ['remark', 'note', 'comment', 'memo'],
+  '编号': ['id', 'code', 'no'],
+  '类型': ['type', 'category'],
+  '价格': ['price', 'cost'],
+  '产品': ['product', 'item'],
+};
+
+function buildFingerprints(headers, rows, profile) {
+  const fps = [];
+  for (let i = 0; i < headers.length; i++) {
+    const p = profile.profiles[i];
+    const fp = {
+      id: 'fp_' + i + '_' + hashCode(headers[i]),
+      originalName: headers[i],
+      colIdx: i,
+      type: p.type,
+      typeConfidence: p.typeConfidence,
+      nameVariants: generateNameVariants(headers[i]),
+      typeSignals: _buildTypeSignals(p),
+      sampleValues: (p.sampleValues || []).slice(0, 8),
+      nullRate: p.nullRate,
+      uniqueRate: profile.rowCount > 0 ? Math.round(p.uniqueCount / profile.rowCount * 100) : 0,
+      isPrimaryKey: p.isPrimaryKey || false,
+      enumValues: p.enumValues,
+      stats: { rowCount: profile.rowCount, uniqueCount: p.uniqueCount },
+    };
+    fps.push(fp);
+  }
+  return fps;
+}
+
+function _buildTypeSignals(p) {
+  const signals = {};
+  if (p.type !== 'string') signals[p.type] = p.typeConfidence;
+  // Approximate from profile data
+  if (p.type === 'money' && p.typeConfidence < 100) {
+    const remaining = 100 - p.typeConfidence;
+    if (remaining > 10) signals['float'] = Math.min(remaining, 30);
+  }
+  if (p.type === 'integer' && p.typeConfidence < 100) {
+    signals['float'] = Math.min(100 - p.typeConfidence, 20);
+  }
+  return signals;
+}
+
+function generateNameVariants(name) {
+  const variants = new Set();
+  variants.add(name);
+  variants.add(name.toLowerCase());
+  // Strip punctuation/spaces
+  const stripped = name.replace(/[\s\-_().（）【】\[\]，。、：；！？]/g, '').toLowerCase();
+  if (stripped) variants.add(stripped);
+  // Check CN-EN map
+  const enSynonyms = CN_EN_MAP[name] || CN_EN_MAP[name.replace(/[()（）]/g, '')];
+  if (enSynonyms) {
+    for (const s of enSynonyms) variants.add(s.toLowerCase());
+  }
+  // Check reverse: if name looks like English, try to find CN equivalent
+  for (const [cn, enList] of Object.entries(CN_EN_MAP)) {
+    if (enList.some(e => e.toLowerCase() === name.toLowerCase())) {
+      variants.add(cn);
+      variants.add(cn.toLowerCase());
+      for (const e of enList) variants.add(e.toLowerCase());
+    }
+  }
+  return [...variants];
+}
+
+function hashCode(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + ch;
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36).slice(0, 6);
+}
+
+/* --- Matching --- */
+
+function matchFingerprints(sourceFPs, targetHeaders, targetRows, targetProfile) {
+  const targetFPs = buildFingerprints(targetHeaders, targetRows, targetProfile);
+  const n = sourceFPs.length;
+  const m = targetFPs.length;
+
+  // Build score matrix
+  const scores = [];
+  for (let i = 0; i < n; i++) {
+    scores[i] = [];
+    for (let j = 0; j < m; j++) {
+      scores[i][j] = computePairScore(sourceFPs[i], targetFPs[j]);
+    }
+  }
+
+  // Greedy best-first assignment
+  const sourceOrder = sourceFPs.map((_, i) => i)
+    .sort((a, b) => Math.max(...scores[b]) - Math.max(...scores[a]));
+
+  const usedTarget = new Set();
+  const mappings = [];
+
+  for (const si of sourceOrder) {
+    // Find best unused target
+    let bestJ = -1, bestScore = -1;
+    for (let j = 0; j < m; j++) {
+      if (!usedTarget.has(j) && scores[si][j] > bestScore) {
+        bestScore = scores[si][j];
+        bestJ = j;
+      }
+    }
+
+    const pct = Math.round(bestScore * 100);
+    let status = 'unmatched';
+    if (pct >= 65) status = 'matched';
+    else if (pct >= 35) status = 'ambiguous';
+
+    // Check ambiguity: top 2 within 10 points
+    if (status === 'matched') {
+      const sorted = scores[si].slice().sort((a, b) => b - a);
+      if (sorted.length >= 2 && Math.round((sorted[0] - sorted[1]) * 100) <= 10) {
+        status = 'ambiguous';
+      }
+    }
+
+    // Collect top candidates for UI
+    const candidates = targetFPs.map((tfp, j) => ({
+      colName: tfp.originalName,
+      colIdx: j,
+      score: Math.round(scores[si][j] * 100),
+      used: usedTarget.has(j),
+    })).sort((a, b) => b.score - a.score).slice(0, 5);
+
+    if (bestJ >= 0) {
+      usedTarget.add(bestJ);
+      mappings.push({
+        sourceFP: sourceFPs[si],
+        targetColName: targetFPs[bestJ].originalName,
+        targetColIdx: bestJ,
+        confidence: pct,
+        status,
+        candidates,
+      });
+    } else {
+      mappings.push({
+        sourceFP: sourceFPs[si],
+        targetColName: '',
+        targetColIdx: -1,
+        confidence: 0,
+        status: 'unmatched',
+        candidates,
+      });
+    }
+  }
+
+  // Detect conflicts (multiple sources -> same target)
+  const targetUsage = new Map();
+  for (const m of mappings) {
+    if (m.targetColIdx < 0) continue;
+    const key = m.targetColName;
+    if (!targetUsage.has(key)) targetUsage.set(key, []);
+    targetUsage.get(key).push(m.sourceFP.originalName);
+  }
+  const conflicts = [];
+  for (const [target, sources] of targetUsage) {
+    if (sources.length > 1) conflicts.push({ target, sources });
+  }
+
+  // Mark conflicting mappings
+  for (const conflict of conflicts) {
+    for (const m of mappings) {
+      if (conflict.sources.includes(m.sourceFP.originalName)) {
+        m.conflict = true;
+      }
+    }
+  }
+
+  // Unmatched target columns
+  const unmatchedTarget = targetFPs
+    .filter((_, j) => !usedTarget.has(j))
+    .map(fp => fp.originalName);
+
+  // Overall confidence
+  const matchedCount = mappings.filter(m => m.status === 'matched').length;
+  const overallConfidence = n > 0 ? Math.round(matchedCount / n * 100) : 0;
+
+  return { mappings, conflicts, unmatchedTarget, overallConfidence };
+}
+
+function computePairScore(src, tgt) {
+  const nameScore = computeNameScore(src, tgt);
+  const typeScore = computeTypeScore(src, tgt);
+  const sampleScore = computeSampleScore(src, tgt);
+  const statsScore = computeStatsScore(src, tgt);
+
+  // Adaptive weights
+  let wName = 0.35, wType = 0.30, wSample = 0.20, wStats = 0.15;
+  if (src.type !== 'string' && tgt.type !== 'string' &&
+      src.typeConfidence >= 70 && tgt.typeConfidence >= 70) {
+    wType = 0.45; wName = 0.25; wSample = 0.15; wStats = 0.15;
+  }
+  if (nameScore > 0.9) {
+    wName = 0.50; wType = 0.20; wSample = 0.15; wStats = 0.15;
+  }
+
+  return wName * nameScore + wType * typeScore + wSample * sampleScore + wStats * statsScore;
+}
+
+function computeNameScore(src, tgt) {
+  // Exact match across variants
+  for (const sv of src.nameVariants) {
+    for (const tv of tgt.nameVariants) {
+      if (sv === tv) return 1.0;
+    }
+  }
+  // Substring containment
+  const srcBase = src.originalName.replace(/[\s\-_().（）【】\[\]]/g, '').toLowerCase();
+  const tgtBase = tgt.originalName.replace(/[\s\-_().（）【】\[\]]/g, '').toLowerCase();
+  if (srcBase && tgtBase) {
+    if (srcBase.includes(tgtBase) || tgtBase.includes(srcBase)) return 0.7;
+  }
+  // Normalized Levenshtein
+  const lev = normalizedLevenshtein(srcBase, tgtBase);
+  return Math.max(0, 1 - lev);
+}
+
+function computeTypeScore(src, tgt) {
+  if (src.type === tgt.type) {
+    return Math.min(1, (src.typeConfidence + tgt.typeConfidence) / 200);
+  }
+  // Compatible types
+  const compatible = new Set(['integer', 'float', 'money']);
+  if (compatible.has(src.type) && compatible.has(tgt.type)) return 0.4;
+  // Type signals overlap
+  const srcSigs = src.typeSignals || {};
+  const tgtSigs = tgt.typeSignals || {};
+  let overlap = 0;
+  for (const [k, v] of Object.entries(srcSigs)) {
+    if (tgtSigs[k]) overlap += Math.min(v, tgtSigs[k]);
+  }
+  return Math.min(0.3, overlap / 200);
+}
+
+function computeSampleScore(src, tgt) {
+  const srcSamples = src.sampleValues || [];
+  const tgtSamples = tgt.sampleValues || [];
+  if (srcSamples.length === 0 && tgtSamples.length === 0) return 0.5;
+  if (srcSamples.length === 0 || tgtSamples.length === 0) return 0.3;
+
+  // Jaccard on exact values
+  const srcSet = new Set(srcSamples.map(v => String(v).trim()));
+  const tgtSet = new Set(tgtSamples.map(v => String(v).trim()));
+  const union = new Set([...srcSet, ...tgtSet]);
+  let intersection = 0;
+  for (const v of srcSet) if (tgtSet.has(v)) intersection++;
+  const jaccard = union.size > 0 ? intersection / union.size : 0;
+
+  // Pattern similarity
+  const srcPatterns = srcSamples.map(extractPattern);
+  const tgtPatterns = tgtSamples.map(extractPattern);
+  const srcPatSet = new Set(srcPatterns);
+  const tgtPatSet = new Set(tgtPatterns);
+  const patUnion = new Set([...srcPatSet, ...tgtPatSet]);
+  let patIntersection = 0;
+  for (const p of srcPatSet) if (tgtPatSet.has(p)) patIntersection++;
+  const patSim = patUnion.size > 0 ? patIntersection / patUnion.size : 0;
+
+  return 0.4 * jaccard + 0.6 * patSim;
+}
+
+function computeStatsScore(src, tgt) {
+  let score = 1.0;
+  // Null rate difference
+  score -= Math.min(0.3, Math.abs(src.nullRate - tgt.nullRate) / 100 * 0.6);
+  // Unique rate difference
+  score -= Math.min(0.3, Math.abs(src.uniqueRate - tgt.uniqueRate) / 100 * 0.6);
+  // Primary key mismatch
+  if (src.isPrimaryKey !== tgt.isPrimaryKey) score -= 0.2;
+  // Row count ratio
+  const maxRows = Math.max(src.stats.rowCount, tgt.stats.rowCount);
+  const minRows = Math.min(src.stats.rowCount, tgt.stats.rowCount);
+  if (maxRows > 0) score -= Math.min(0.1, (1 - minRows / maxRows) * 0.2);
+  return Math.max(0, score);
+}
+
+function extractPattern(value) {
+  return String(value)
+    .replace(/[A-Z]/g, 'A')
+    .replace(/[a-z]/g, 'a')
+    .replace(/[0-9]/g, '#')
+    .replace(/[\u4e00-\u9fff]/g, 'C');
+}
+
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function normalizedLevenshtein(a, b) {
+  if (!a && !b) return 0;
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 0;
+  return levenshtein(a, b) / maxLen;
 }

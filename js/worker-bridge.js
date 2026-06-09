@@ -109,5 +109,16 @@ class WorkerBridge {
   executeRules(headers, rows, rules, allDatasets) {
     return this.send('executeRules', { headers, rows, rules, allDatasets });
   }
+  executeRecipeStep(headers, rows, stepConfig, allDatasets) {
+    return this.send('executeRecipeStep', { headers, rows, stepConfig, allDatasets });
+  }
+  computeFingerprints(headers, rows, profile) {
+    return this.sendUnversioned('computeFingerprints', { headers, rows, profile });
+  }
+  matchFingerprints(sourceFingerprints, targetHeaders, targetRows, targetProfile) {
+    return this.sendUnversioned('matchFingerprints', {
+      sourceFingerprints, targetHeaders, targetRows, targetProfile
+    });
+  }
   terminate() { this.worker.terminate(); }
 }

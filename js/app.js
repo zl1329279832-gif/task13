@@ -10,6 +10,9 @@ class App {
     this.grid = new DataGrid(document.getElementById('dataView'));
     this.rulesPanel = new RulesPanel(this);
     this.resultsView = new ResultsView(this);
+    this.recipePanel = new RecipePanel(this);
+    this.recipeReplay = new RecipeReplayEngine(this);
+    this._lastExecutionResult = null;
 
     /** Max undo history per dataset */
     this.maxHistory = 50;
@@ -31,6 +34,11 @@ class App {
     document.getElementById('btnExportCSV').addEventListener('click', () => this.exportCSV());
     document.getElementById('btnExportReport').addEventListener('click', () => this.exportReport());
     document.getElementById('btnExportRules').addEventListener('click', () => this.exportRulesJSON());
+    document.getElementById('btnSaveRecipe').addEventListener('click', () => this.saveRecipe());
+    document.getElementById('btnManageRecipes').addEventListener('click', () => {
+      this.switchTab('recipes');
+      this.recipePanel.render();
+    });
 
     document.getElementById('dropHint').addEventListener('click', () => document.getElementById('fileInput').click());
     document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -40,6 +48,11 @@ class App {
 
     document.getElementById('rulesFileInput').addEventListener('change', (e) => {
       if (e.target.files.length) this._importRulesFile(e.target.files[0]);
+      e.target.value = '';
+    });
+
+    document.getElementById('recipeFileInput').addEventListener('change', (e) => {
+      if (e.target.files.length) this._importRecipeFile(e.target.files[0]);
       e.target.value = '';
     });
   }
@@ -394,6 +407,7 @@ class App {
 
       hideLoading();
 
+      this._lastExecutionResult = { result, profileBefore, rules: rules.slice() };
       this.resultsView.show(result, profileBefore);
       this.switchTab('results');
       this._pushHistory();
@@ -541,6 +555,182 @@ class App {
       } else {
         toast('无效的 JSON 格式', 'error');
       }
+    } catch (err) {
+      toast('导入失败: ' + err.message, 'error');
+    }
+  }
+
+  /* ============================================================
+     Recipe Capture
+     ============================================================ */
+  async captureRecipe() {
+    const ds = this.getActiveDataset();
+    if (!ds) { toast('请先导入数据', 'warning'); return null; }
+
+    const rules = this.rulesPanel.getRules().filter(r => r.enabled !== false);
+    if (rules.length === 0) { toast('请先添加清洗规则', 'warning'); return null; }
+
+    showLoading('正在生成列指纹...');
+    try {
+      const fpResult = await this.worker.computeFingerprints(
+        ds.originalHeaders || ds.headers,
+        ds.originalRows || ds.rows,
+        ds.profile
+      );
+
+      const fingerprints = fpResult.fingerprints;
+
+      // Build recipe steps from current rules
+      const steps = rules.map((rule, idx) => {
+        const columnRefs = this._extractColumnRefs(rule, fingerprints, ds.originalHeaders || ds.headers);
+        return {
+          index: idx,
+          ruleType: rule.type,
+          name: rule.name || ruleLabel(rule.type),
+          enabled: rule.enabled !== false,
+          config: deepClone(rule),
+          columnRefs,
+          executionStats: this._getExecutionStats(idx),
+        };
+      });
+
+      const recipe = {
+        id: uid(),
+        name: (this.activeDatasetName || 'data') + '_recipe',
+        version: 1,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        sourceInfo: {
+          headers: (ds.originalHeaders || ds.headers).slice(),
+          fingerprints,
+          rowCount: ds.originalRows ? ds.originalRows.length : ds.rows.length,
+          columnCount: (ds.originalHeaders || ds.headers).length,
+          qualityScore: ds.profile ? ds.profile.quality : 0,
+        },
+        steps,
+      };
+
+      hideLoading();
+      return recipe;
+    } catch (err) {
+      hideLoading();
+      toast('生成方案失败: ' + err.message, 'error');
+      return null;
+    }
+  }
+
+  _extractColumnRefs(rule, fingerprints, headers) {
+    const refs = [];
+    const findFP = (colName) => {
+      const fp = fingerprints.find(f => f.originalName === colName);
+      return fp ? fp.id : null;
+    };
+
+    switch (rule.type) {
+      case 'nullFill':
+      case 'fieldSplit':
+      case 'dateNormalize':
+      case 'amountConvert':
+      case 'enumMap': {
+        if (rule.column) {
+          const fpId = findFP(rule.column);
+          if (fpId) refs.push({ configKey: 'column', fingerprintId: fpId });
+        }
+        break;
+      }
+      case 'dedup': {
+        if (rule.columns) {
+          for (const col of rule.columns) {
+            const fpId = findFP(col);
+            if (fpId) refs.push({ configKey: 'columns[]', fingerprintId: fpId });
+          }
+        }
+        break;
+      }
+      case 'crossValidate': {
+        if (rule.thisColumn) {
+          const fpId = findFP(rule.thisColumn);
+          if (fpId) refs.push({ configKey: 'thisColumn', fingerprintId: fpId });
+        }
+        break;
+      }
+      case 'rename': {
+        if (rule.mapping) {
+          for (const oldName of Object.keys(rule.mapping)) {
+            const fpId = findFP(oldName);
+            if (fpId) refs.push({ configKey: 'mapping.' + oldName, fingerprintId: fpId });
+          }
+        }
+        break;
+      }
+      case 'trim':
+        // No column references needed
+        break;
+    }
+    return refs;
+  }
+
+  _getExecutionStats(ruleIdx) {
+    if (!this._lastExecutionResult || !this._lastExecutionResult.result) return {};
+    const logs = this._lastExecutionResult.result.logs || [];
+    const log = logs.find(l => l.ruleIndex === ruleIdx);
+    if (!log) return {};
+    return {
+      affectedCount: log.affectedCount || 0,
+    };
+  }
+
+  async saveRecipe() {
+    const recipe = await this.captureRecipe();
+    if (!recipe) return;
+
+    const name = prompt('方案名称:', recipe.name) || recipe.name;
+    recipe.name = name;
+    recipe.id = name.replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '_') + '_' + uid();
+
+    try {
+      await store.saveRecipe(recipe);
+      toast('方案已保存: ' + name, 'success');
+    } catch (err) {
+      if (store._recipeMemoryStore.has(recipe.id)) {
+        toast('方案已暂存到内存 (IndexedDB 不可用): ' + name, 'warning');
+      } else {
+        toast('保存失败: ' + err.message, 'error');
+      }
+    }
+  }
+
+  async _importRecipeFile(file) {
+    try {
+      const text = await readFileAsText(file);
+      const data = JSON.parse(text);
+
+      let recipe = null;
+      if (data.type === 'recipe' && data.recipe) {
+        recipe = data.recipe;
+      } else if (data.type === 'recipes' && Array.isArray(data.recipes)) {
+        // Import multiple recipes
+        for (const r of data.recipes) {
+          r.id = r.name.replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '_') + '_' + uid();
+          r.updatedAt = Date.now();
+          await store.saveRecipe(r);
+        }
+        toast('已导入 ' + data.recipes.length + ' 个方案', 'success');
+        this.switchTab('recipes');
+        this.recipePanel.render();
+        return;
+      } else if (data.steps && Array.isArray(data.steps)) {
+        recipe = data;
+      }
+
+      if (!recipe) { toast('无效的 JSON 格式', 'error'); return; }
+
+      recipe.id = recipe.name.replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '_') + '_' + uid();
+      recipe.updatedAt = Date.now();
+      await store.saveRecipe(recipe);
+      toast('已导入方案: ' + recipe.name, 'success');
+      this.switchTab('recipes');
+      this.recipePanel.render();
     } catch (err) {
       toast('导入失败: ' + err.message, 'error');
     }

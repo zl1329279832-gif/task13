@@ -20,6 +20,9 @@
       <button id="btnSaveRules" title="保存规则配置">保存规则</button>
       <button id="btnLoadRules" title="加载规则配置">加载规则</button>
       <span class="sep"></span>
+      <button id="btnSaveRecipe" title="保存当前规则为清洗方案">保存方案</button>
+      <button id="btnManageRecipes" title="管理清洗方案">方案管理</button>
+      <span class="sep"></span>
       <button id="btnExportCSV" title="导出清洗后 CSV" disabled>导出 CSV</button>
       <button id="btnExportReport" title="导出错误报告" disabled>错误报告</button>
       <button id="btnExportRules" title="导出规则 JSON">规则 JSON</button>
@@ -69,6 +72,7 @@
           <button class="tab" data-tab="data">数据预览</button>
           <button class="tab" data-tab="rules">清洗规则</button>
           <button class="tab" data-tab="results">清洗结果</button>
+          <button class="tab" data-tab="recipes">清洗方案</button>
         </div>
 
         <!-- Profile -->
@@ -125,6 +129,13 @@
             <p class="placeholder">执行清洗规则后查看结果</p>
           </div>
         </div>
+
+        <!-- Recipes -->
+        <div id="tabRecipes" class="tab-content" style="display:none">
+          <div id="recipesContent" class="recipes-content">
+            <p class="placeholder">执行清洗规则后可保存为可复用的清洗方案</p>
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -163,12 +174,15 @@
   </div>
 
   <input type="file" id="rulesFileInput" accept=".json" hidden>
+  <input type="file" id="recipeFileInput" accept=".json" hidden>
 
   <script src="js/utils.js"></script>
   <script src="js/store.js"></script>
   <script src="js/worker-bridge.js"></script>
   <script src="js/grid.js"></script>
   <script src="js/rules-panel.js"></script>
+  <script src="js/recipe-panel.js"></script>
+  <script src="js/recipe-replay.js"></script>
   <script src="js/results.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -539,3 +539,145 @@ label input[type="checkbox"] { cursor: pointer; }
 
 .text-danger { color: var(--danger); }
 .text-muted { color: var(--text-muted); }
+
+/* ---------- Recipe Tab ---------- */
+.recipes-content { padding: 0; }
+.recipe-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; background: var(--surface);
+  border-radius: var(--radius); margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
+}
+.recipe-list { display: flex; flex-direction: column; gap: 6px; }
+.recipe-card {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 12px 14px; box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border); display: flex;
+  align-items: center; gap: 10px; transition: border-color 0.15s;
+}
+.recipe-card:hover { border-color: var(--text-muted); }
+.recipe-icon {
+  font-size: 10px; font-weight: 700; color: var(--primary);
+  background: var(--primary-light); padding: 6px 8px;
+  border-radius: var(--radius-sm); letter-spacing: 0.5px;
+}
+.recipe-info { flex: 1; min-width: 0; }
+.recipe-name { font-weight: 600; font-size: 13px; }
+.recipe-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.recipe-actions { display: flex; gap: 4px; align-items: center; }
+
+/* ---------- Match Preview Modal ---------- */
+.match-preview { max-height: 60vh; overflow-y: auto; }
+.match-overall {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--surface-alt);
+  border-radius: var(--radius-sm); margin-bottom: 8px;
+}
+.match-overall-score { font-size: 18px; font-family: var(--mono); }
+.match-overall-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.match-overall-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+.match-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.match-row.match-matched { border-left: 3px solid var(--success); }
+.match-row.match-ambiguous { border-left: 3px solid var(--warning); }
+.match-row.match-unmatched { border-left: 3px solid var(--danger); }
+.match-row.match-conflict { border-left: 3px solid #e67e22; background: #fef5ec; }
+.match-source { font-weight: 600; font-size: 13px; min-width: 80px; }
+.match-arrow { color: var(--text-muted); font-size: 14px; }
+.match-target { flex: 1; min-width: 120px; }
+.match-select { width: 100%; font-size: 12px; padding: 4px 8px; }
+.match-confidence { font-size: 12px; font-weight: 600; font-family: var(--mono); min-width: 40px; text-align: right; }
+.match-notes { width: 100%; }
+.match-warning { font-size: 11px; color: #856404; background: var(--warning-light); padding: 3px 6px; border-radius: 3px; margin-top: 2px; }
+.match-hint { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+/* ---------- Step Preview ---------- */
+.step-preview { padding: 0; }
+.replay-controls {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; background: var(--surface-alt);
+  border-radius: var(--radius-sm); margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.replay-progress {
+  flex: 1; min-width: 60px; height: 6px;
+  background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.replay-progress-fill {
+  height: 100%; background: var(--primary); border-radius: 3px;
+  width: 0%; transition: width 0.3s;
+}
+.replay-progress-text { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+.step-list { display: flex; flex-direction: column; gap: 4px; }
+.step-preview-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); transition: all 0.2s;
+}
+.step-preview-item.step-pending { opacity: 0.6; }
+.step-preview-item.step-active {
+  border-color: var(--primary); background: var(--primary-light);
+  opacity: 1; animation: pulse 1.5s ease infinite;
+}
+.step-preview-item.step-done {
+  border-color: var(--success); background: var(--success-light); opacity: 1;
+}
+.step-preview-item.step-error {
+  border-color: var(--danger); background: var(--danger-light); opacity: 1;
+}
+.step-preview-item.step-skipped { opacity: 0.5; border-style: dashed; }
+.step-idx {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; background: var(--border);
+  color: var(--text-secondary); flex-shrink: 0;
+}
+.step-done .step-idx { background: var(--success); color: #fff; }
+.step-error .step-idx { background: var(--danger); color: #fff; }
+.step-active .step-idx { background: var(--primary); color: #fff; }
+.step-info { flex: 1; min-width: 0; }
+.step-name { font-size: 13px; font-weight: 600; }
+.step-mapping { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+.step-stats { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.step-skip-reason { font-size: 10px; color: var(--warning); font-weight: normal; }
+.step-cross-warn { font-size: 10px; color: #e67e22; font-weight: normal; }
+.step-skipped-text { color: var(--text-muted); font-style: italic; }
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79,142,247,0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(79,142,247,0.1); }
+}
+
+/* ---------- Recipe Preview Detail ---------- */
+.recipe-preview-detail h4 { font-size: 14px; margin-bottom: 4px; }
+.recipe-step-preview {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.recipe-step-preview .step-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary-light); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+}
+.recipe-fp-preview {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px; border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+.recipe-fp-preview .fp-name { font-weight: 600; min-width: 80px; }
+.recipe-fp-preview .fp-type {
+  font-size: 10px; padding: 1px 5px; border-radius: 8px;
+  background: var(--surface-alt); color: var(--text-secondary);
+}
+.recipe-fp-preview .fp-samples {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--text-muted); overflow: hidden; text-overflow: ellipsis;
+}

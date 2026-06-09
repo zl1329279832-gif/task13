@@ -134,5 +134,18 @@ const RULE_META = {
   rename:        { icon: 'REN', label: '字段重命名' },
 };
 
+const MATCH_STATUS_LABELS = {
+  matched: '已匹配',
+  ambiguous: '待确认',
+  unmatched: '未匹配',
+  skipped: '已跳过',
+};
+
+function confidenceColor(score) {
+  if (score >= 65) return 'var(--success)';
+  if (score >= 35) return 'var(--warning)';
+  return 'var(--danger)';
+}
+
 function ruleIcon(type) { return (RULE_META[type] || {}).icon || '???'; }
 function ruleLabel(type) { return (RULE_META[type] || {}).label || type; }
