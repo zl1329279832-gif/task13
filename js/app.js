@@ -10,6 +10,9 @@ class App {
     this.grid = new DataGrid(document.getElementById('dataView'));
     this.rulesPanel = new RulesPanel(this);
     this.resultsView = new ResultsView(this);
+    this.recipeManager = new RecipeManager(this);
+    this.recipePlayer = new RecipePlayer(this);
+    this.recipePanel = new RecipePanel(this);
 
     /** Max undo history per dataset */
     this.maxHistory = 50;
@@ -31,6 +34,7 @@ class App {
     document.getElementById('btnExportCSV').addEventListener('click', () => this.exportCSV());
     document.getElementById('btnExportReport').addEventListener('click', () => this.exportReport());
     document.getElementById('btnExportRules').addEventListener('click', () => this.exportRulesJSON());
+    document.getElementById('btnExportRecipe').addEventListener('click', () => this.exportRecipeJSON());
 
     document.getElementById('dropHint').addEventListener('click', () => document.getElementById('fileInput').click());
     document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -260,6 +264,7 @@ class App {
     const tabEl = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
     if (tabEl) { tabEl.style.display = ''; tabEl.classList.add('active'); }
     if (tabName === 'data') requestAnimationFrame(() => this.grid.render());
+    if (tabName === 'recipe') this.recipePanel.render();
   }
 
   /* ============================================================
@@ -401,6 +406,13 @@ class App {
 
       toast(`清洗完成! 质量 ${profileBefore.quality} -> ${ds.profile.quality}`,
         ds.profile.quality >= profileBefore.quality ? 'success' : 'warning');
+
+      // Offer recipe recording
+      const shouldRecord = confirm('清洗完成！是否将这些规则录制为可复用配方？');
+      if (shouldRecord) {
+        const enabledRules = this.rulesPanel.getRules().filter(r => r.enabled !== false);
+        await this.recipeManager.offerRecording(enabledRules, ds);
+      }
     } catch (err) {
       hideLoading();
       if (err.message === 'STALE_TASK' || err.message === 'CANCELLED') return;
@@ -572,6 +584,28 @@ class App {
     const json = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), rules }, null, 2);
     downloadFile(json, 'cleaning_rules.json', 'application/json');
     toast('已导出规则配置', 'success');
+  }
+
+  async exportRecipeJSON() {
+    try {
+      const recipes = await this.recipeManager.loadRecipes();
+      if (recipes.length === 0) { toast('暂无配方可导出', 'warning'); return; }
+      if (recipes.length === 1) {
+        this.recipeManager.exportRecipeJSON(recipes[0]);
+        toast('已导出配方', 'success');
+        return;
+      }
+      const names = recipes.map((r, i) => `${i + 1}. ${r.name}`).join('\n');
+      const choice = prompt('选择要导出的配方:\n' + names);
+      if (!choice) return;
+      const idx = parseInt(choice) - 1;
+      if (idx >= 0 && idx < recipes.length) {
+        this.recipeManager.exportRecipeJSON(recipes[idx]);
+        toast('已导出配方', 'success');
+      }
+    } catch (err) {
+      toast('导出失败: ' + err.message, 'error');
+    }
   }
 }
 

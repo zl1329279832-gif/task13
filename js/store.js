@@ -1,7 +1,7 @@
 /* store.js — IndexedDB storage for rules with in-memory fallback */
 
 const DB_NAME = 'CSVDataCleaner';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 class Store {
   constructor() {
@@ -38,31 +38,27 @@ class Store {
               store.createIndex('name', 'name', { unique: false });
             }
 
-            // Data migration: validate/fix existing records
-            // Old format: { id, name, rules, savedAt } — name field already exists
-            // But some early records might be missing savedAt or have corrupt data
             const cursorReq = store.openCursor();
             cursorReq.onsuccess = (ce) => {
               const cursor = ce.target.result;
               if (!cursor) return;
               const record = cursor.value;
-              // Ensure required fields exist
               let needsUpdate = false;
-              if (record.savedAt == null) {
-                record.savedAt = Date.now();
-                needsUpdate = true;
-              }
-              if (!Array.isArray(record.rules)) {
-                record.rules = [];
-                needsUpdate = true;
-              }
-              if (record.name == null) {
-                record.name = record.id || 'unnamed';
-                needsUpdate = true;
-              }
+              if (record.savedAt == null) { record.savedAt = Date.now(); needsUpdate = true; }
+              if (!Array.isArray(record.rules)) { record.rules = []; needsUpdate = true; }
+              if (record.name == null) { record.name = record.id || 'unnamed'; needsUpdate = true; }
               if (needsUpdate) cursor.update(record);
               cursor.continue();
             };
+          }
+
+          // v2 -> v3: add recipes store
+          if (oldVersion < 3) {
+            if (!db.objectStoreNames.contains('recipes')) {
+              const recipeStore = db.createObjectStore('recipes', { keyPath: 'id' });
+              recipeStore.createIndex('name', 'name', { unique: false });
+              recipeStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+            }
           }
         };
 
@@ -178,6 +174,88 @@ class Store {
       });
     } catch (err) {
       return this._memoryStore.get(id) || null;
+    }
+  }
+
+  /* ---- Recipe CRUD (mirrors rules pattern) ---- */
+
+  async saveRecipe(recipe) {
+    recipe.updatedAt = Date.now();
+    if (!this.dbAvailable) {
+      this._memoryStore.set('recipe_' + recipe.id, recipe);
+      return;
+    }
+    try {
+      await new Promise((resolve, reject) => {
+        const tx = this._safeTransaction('recipes', 'readwrite');
+        tx.objectStore('recipes').put(recipe);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => {
+          const err = e.target.error;
+          reject(new Error(
+            err && err.name === 'QuotaExceededError'
+              ? 'Storage quota exceeded'
+              : 'Failed to save recipe'
+          ));
+        };
+      });
+      this._memoryStore.set('recipe_' + recipe.id, recipe);
+    } catch (err) {
+      this._memoryStore.set('recipe_' + recipe.id, recipe);
+      throw err;
+    }
+  }
+
+  async listRecipes() {
+    if (!this.dbAvailable) {
+      return [...this._memoryStore.values()]
+        .filter(v => v && v.steps)
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    }
+    try {
+      return await new Promise((resolve, reject) => {
+        const tx = this._safeTransaction('recipes', 'readonly');
+        const req = tx.objectStore('recipes').getAll();
+        req.onsuccess = () => {
+          const results = (req.result || []).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+          for (const r of results) this._memoryStore.set('recipe_' + r.id, r);
+          resolve(results);
+        };
+        tx.onerror = () => reject(new Error('Failed to list recipes'));
+      });
+    } catch (err) {
+      return [...this._memoryStore.values()]
+        .filter(v => v && v.steps)
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    }
+  }
+
+  async getRecipe(id) {
+    if (!this.dbAvailable) return this._memoryStore.get('recipe_' + id) || null;
+    try {
+      return await new Promise((resolve, reject) => {
+        const tx = this._safeTransaction('recipes', 'readonly');
+        const req = tx.objectStore('recipes').get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        tx.onerror = () => reject(new Error('Failed to get recipe'));
+      });
+    } catch (err) {
+      return this._memoryStore.get('recipe_' + id) || null;
+    }
+  }
+
+  async deleteRecipe(id) {
+    this._memoryStore.delete('recipe_' + id);
+    if (!this.dbAvailable) return;
+    try {
+      await new Promise((resolve, reject) => {
+        const tx = this._safeTransaction('recipes', 'readwrite');
+        tx.objectStore('recipes').delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(new Error('Failed to delete recipe'));
+      });
+    } catch (err) {
+      console.warn('IDB recipe delete failed:', err.message);
     }
   }
 }

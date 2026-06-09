@@ -539,3 +539,164 @@ label input[type="checkbox"] { cursor: pointer; }
 
 .text-danger { color: var(--danger); }
 .text-muted { color: var(--text-muted); }
+
+/* ---------- Recipe Tab ---------- */
+.recipe-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+.recipe-toolbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+.recipe-playback-info { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+
+.recipe-list { display: flex; flex-direction: column; gap: 6px; }
+.recipe-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: border-color 0.15s;
+}
+.recipe-card:hover { border-color: var(--text-muted); }
+.recipe-card .rc-icon { font-size: 22px; color: var(--primary); width: 32px; text-align: center; flex-shrink: 0; }
+.recipe-card .rc-info { flex: 1; min-width: 0; }
+.recipe-card .rc-name { font-weight: 600; font-size: 13px; }
+.recipe-card .rc-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.recipe-card .rc-actions { display: flex; gap: 4px; }
+
+/* Recipe Preview */
+.recipe-preview {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 10px;
+}
+.recipe-preview h4 { font-size: 14px; margin-bottom: 10px; }
+
+.match-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+.match-table th, .match-table td { padding: 6px 8px; border: 1px solid var(--border); text-align: left; }
+.match-table th { background: var(--surface-alt); font-weight: 600; font-size: 11px; }
+.match-table .match-exact { color: var(--success); }
+.match-table .match-fuzzy_name, .match-table .match-type_match { color: var(--warning); }
+.match-table .match-ambiguous { color: #e67e22; }
+.match-table .match-missing { color: var(--danger); }
+.match-table .match-conf { font-family: var(--mono); font-size: 11px; }
+.match-table select { font-size: 11px; padding: 2px 4px; }
+
+.conflict-alert {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-light);
+  border-left: 3px solid var(--warning);
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: #856404;
+}
+.conflict-alert.conflict-error {
+  background: var(--danger-light);
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
+.step-preview-list { margin-top: 10px; }
+.step-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.step-preview-item .sp-order { width: 24px; text-align: center; color: var(--text-muted); font-weight: 600; font-size: 11px; }
+.step-preview-item .sp-type { font-size: 10px; font-weight: 700; color: var(--primary); width: 30px; }
+.step-preview-item .sp-desc { flex: 1; }
+.step-preview-item .sp-cols { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
+
+.preview-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+
+/* Recipe Playback */
+.recipe-playback {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 10px;
+}
+
+.playback-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.playback-header h4 { font-size: 14px; margin: 0; }
+
+.playback-progress { margin-bottom: 12px; }
+.playback-progress .pp-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.playback-progress .pp-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.3s; }
+.playback-progress .pp-text { font-size: 11px; color: var(--text-secondary); margin-top: 4px; text-align: right; }
+
+.playback-controls { display: flex; gap: 6px; margin-bottom: 14px; align-items: center; }
+.playback-controls .pc-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+.playback-current {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+  background: var(--primary-light);
+}
+.playback-current .pc-title { font-weight: 600; font-size: 13px; }
+.playback-current .pc-detail { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+.playback-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pm-item {
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  text-align: center;
+}
+.pm-item .pm-value { font-size: 18px; font-weight: 700; font-family: var(--mono); }
+.pm-item .pm-label { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+.pm-item.pm-good .pm-value { color: var(--success); }
+.pm-item.pm-bad .pm-value { color: var(--danger); }
+.pm-item.pm-warn .pm-value { color: var(--warning); }
+
+.playback-log { margin-top: 10px; }
+.playback-log h5 { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.pb-step-log {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.pb-step-log .psl-order { width: 24px; text-align: center; color: var(--text-muted); font-weight: 600; }
+.pb-step-log .psl-name { flex: 1; }
+.pb-step-log .psl-affected { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); }
+.pb-step-log .psl-quality { font-family: var(--mono); font-size: 11px; }
+.pb-step-log .psl-quality.improved { color: var(--success); }
+.pb-step-log .psl-quality.degraded { color: var(--danger); }
+.pb-step-log .psl-status { font-size: 10px; padding: 1px 6px; border-radius: 8px; }
+.pb-step-log .psl-status.ok { background: var(--success-light); color: var(--success); }
+.pb-step-log .psl-status.error { background: var(--danger-light); color: var(--danger); }
+.pb-step-log .psl-status.skipped { background: var(--surface-alt); color: var(--text-muted); }
+
+.recipe-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px;
+  font-size: 13px;
+}

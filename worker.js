@@ -30,6 +30,33 @@ self.onmessage = function (e) {
         send({ success: true, result });
         break;
       }
+      case 'computeFingerprint': {
+        const fingerprints = computeColumnFingerprints(payload.headers, payload.rows, payload.profiles);
+        send({ success: true, fingerprints });
+        break;
+      }
+      case 'executeRecipeStep': {
+        const { headers, rows, rule, allDatasets } = payload;
+        const profileBefore = profileDataset(headers, rows);
+        const stepHeaders = headers.slice();
+        const stepRows = rows.map(r => r.slice());
+        const result = executeOneRule(stepHeaders, stepRows, rule, allDatasets);
+        const newHeaders = result.headers || stepHeaders;
+        const newRows = result.rows || stepRows;
+        const profileAfter = profileDataset(newHeaders, newRows);
+        send({
+          success: true,
+          headers: newHeaders,
+          rows: newRows,
+          profileBefore,
+          profileAfter,
+          affectedCount: result.affectedCount || 0,
+          changes: (result.changes || []).slice(0, 200),
+          affectedRows: (result.affectedRows || []).slice(0, 100),
+          error: result.error || null
+        });
+        break;
+      }
       default:
         send({ success: false, error: 'Unknown task: ' + task });
     }
@@ -764,4 +791,40 @@ function crossValidate(datasets, rules) {
     results.push({ rule, ...res });
   }
   return results;
+}
+
+/* ============================================================
+   COLUMN FINGERPRINT — extract fingerprint data from profiles
+   ============================================================ */
+function computeColumnFingerprints(headers, rows, profiles) {
+  if (profiles && profiles.profiles) {
+    return profiles.profiles.map((p, i) => ({
+      name: p.column,
+      index: i,
+      detectedType: p.type,
+      typeConfidence: p.typeConfidence,
+      nullRate: p.nullRate,
+      isEnum: p.isEnum || false,
+      enumValues: p.enumValues ? p.enumValues.slice(0, 10).map(e => e.value) : null,
+      sampleValues: (p.sampleValues || []).slice(0, 5),
+      uniqueRatio: (p.validCount + p.dirtyCount) > 0
+        ? p.uniqueCount / (p.validCount + p.dirtyCount)
+        : 0
+    }));
+  }
+  // Fallback: compute from scratch
+  const profile = profileDataset(headers, rows);
+  return profile.profiles.map((p, i) => ({
+    name: p.column,
+    index: i,
+    detectedType: p.type,
+    typeConfidence: p.typeConfidence,
+    nullRate: p.nullRate,
+    isEnum: p.isEnum || false,
+    enumValues: p.enumValues ? p.enumValues.slice(0, 10).map(e => e.value) : null,
+    sampleValues: (p.sampleValues || []).slice(0, 5),
+    uniqueRatio: (p.validCount + p.dirtyCount) > 0
+      ? p.uniqueCount / (p.validCount + p.dirtyCount)
+      : 0
+  }));
 }
