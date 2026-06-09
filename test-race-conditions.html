@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Race Condition Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #e0e0e0; }
+    .test { margin: 8px 0; padding: 8px 12px; border-radius: 4px; }
+    .pass { background: #1b4332; color: #95d5b2; }
+    .fail { background: #641220; color: #f4a4a8; }
+    .info { background: #1a1a3e; color: #aab; margin: 2px 0 2px 24px; font-size: 12px; }
+    h2 { color: #7ecfff; margin-top: 24px; }
+    #summary { margin-top: 20px; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; }
+    /* Hide the actual app UI */
+    #appContainer { display: none; }
+  </style>
+</head>
+<body>
+  <h1>CSV Cleaner Race Condition Tests</h1>
+  <div id="results"></div>
+  <div id="summary"></div>
+
+  <!-- Minimal DOM structure required by the app classes -->
+  <div id="appContainer">
+    <div id="toastContainer"></div>
+    <div id="loadingOverlay" style="display:none"><p id="loadingText"></p><div><div id="progressFill"></div></div></div>
+    <div id="dropOverlay"></div>
+    <div id="welcomeScreen" style="display:none"></div>
+    <div id="dataView" style="display:none">
+      <div id="tabBar"><button class="tab active" data-tab="profile"></button><button class="tab" data-tab="data"></button><button class="tab" data-tab="rules"></button><button class="tab" data-tab="results"></button><button class="tab" data-tab="recipes"></button></div>
+      <div id="tabProfile" class="tab-content"><canvas id="qualityCanvas" width="120" height="120"></canvas><div id="qualityBreakdown"></div><div id="columnProfiles"></div></div>
+      <div id="tabData" class="tab-content" style="display:none"></div>
+      <div id="tabRules" class="tab-content" style="display:none">
+        <select id="ruleTypeSelect"><option value="">--</option></select>
+        <button id="btnAddRule"></button><button id="btnExecuteAll"></button><button id="btnClearRules"></button>
+        <div id="rulesList"></div>
+      </div>
+      <div id="tabResults" class="tab-content" style="display:none"><div id="resultsContent"></div></div>
+      <div id="tabRecipes" class="tab-content" style="display:none"><div id="recipesContent"></div></div>
+    </div>
+    <div id="sidebar"><div id="datasetList"></div><div id="dropHint"><input type="file" id="fileInput" multiple hidden></div></div>
+    <div id="profileSummary" style="display:none"><div id="profileContent"></div></div>
+    <button id="btnUndo" disabled></button><button id="btnRedo" disabled></button>
+    <button id="btnSaveRules"></button><button id="btnLoadRules"></button>
+    <button id="btnExportCSV" disabled></button><button id="btnExportReport" disabled></button><button id="btnExportRules"></button>
+    <button id="btnSaveRecipe"></button><button id="btnManageRecipes"></button>
+    <input type="file" id="rulesFileInput" hidden><input type="file" id="recipeFileInput" hidden>
+    <div id="ruleModal" class="modal" style="display:none"><div class="modal-backdrop"></div><div class="modal-content"><h3 id="modalTitle"></h3><button class="modal-close"></button><div id="modalBody"></div><button id="modalCancel"></button><button id="modalConfirm"></button></div></div>
+    <div id="gridContainer"><div id="gridHeader"></div><div id="gridBody"></div></div>
+  </div>
+
+  <script>
+  // ============================================================
+  // Test harness
+  // ============================================================
+  const testResults = [];
+  const resultsDiv = document.getElementById('results');
+
+  function log(msg, cls) {
+    const d = document.createElement('div');
+    d.className = cls || 'info';
+    d.textContent = msg;
+    resultsDiv.appendChild(d);
+  }
+
+  function assert(condition, label) {
+    const passed = !!condition;
+    testResults.push({ label, passed });
+    log((passed ? 'PASS' : 'FAIL') + ': ' + label, passed ? 'test pass' : 'test fail');
+    return passed;
+  }
+
+  function showSummary() {
+    const total = testResults.length;
+    const passed = testResults.filter(t => t.passed).length;
+    const el = document.getElementById('summary');
+    const allPass = passed === total;
+    el.style.background = allPass ? '#1b4332' : '#641220';
+    el.style.color = allPass ? '#95d5b2' : '#f4a4a8';
+    el.textContent = `${passed}/${total} tests passed` + (allPass ? ' — ALL PASS' : '');
+  }
+
+  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ============================================================
+  // Mock helpers
+  // ============================================================
+  function mockProfile(colCount) {
+    const profiles = [];
+    for (let i = 0; i < colCount; i++) {
+      profiles.push({
+        column: 'col' + i, type: 'string', typeConfidence: 90,
+        validCount: 100, nullCount: 0, nullRate: 0, uniqueCount: 80,
+        dirtyCount: 0, dirtySamples: [], sampleValues: ['a', 'b'],
+        isPrimaryKey: i === 0, isEnum: false, enumValues: [],
+      });
+    }
+    return {
+      rowCount: 100, columnCount: colCount, duplicateCount: 0, quality: 75,
+      qualityBreakdown: { completeness: 80, uniqueness: 70, validity: 75 },
+      profiles,
+    };
+  }
+
+  function mockFingerprints(headers) {
+    return headers.map((h, i) => ({
+      id: 'fp_' + i + '_' + h, originalName: h, colIdx: i,
+      type: 'string', typeConfidence: 90,
+      nameVariants: [h, h.toLowerCase()],
+      typeSignals: {}, sampleValues: ['a', 'b'],
+      nullRate: 0, uniqueRate: 80, isPrimaryKey: i === 0,
+      enumValues: [], stats: { rowCount: 100, uniqueCount: 80 },
+    }));
+  }
+
+  // ============================================================
+  // MockWorker — replaces the real Web Worker
+  // ============================================================
+  class MockWorker {
+    constructor(url) {
+      this.onmessage = null;
+      this.onerror = null;
+      this._delay = 5;
+      this._paused = false;
+      this._queue = [];
+    }
+
+    postMessage(data) {
+      const { task, id, payload } = data;
+      const timer = setTimeout(() => {
+        if (this._paused) {
+          this._queue.push({ task, id, payload });
+          return;
+        }
+        this._respond(task, id, payload);
+      }, this._delay);
+    }
+
+    _respond(task, id, payload) {
+      let response;
+      switch (task) {
+        case 'parse':
+          response = { id, success: true, headers: payload.text === 'B' ? ['x', 'y', 'z'] : ['col1', 'col2'], rows: [['a', 'b']], profile: mockProfile(2), parseErrors: [] };
+          break;
+        case 'profile':
+          response = { id, success: true, profile: mockProfile(payload.headers.length) };
+          break;
+        case 'computeFingerprints':
+          response = { id, success: true, fingerprints: mockFingerprints(payload.headers) };
+          break;
+        case 'matchFingerprints':
+          response = {
+            id, success: true,
+            mappings: (payload.sourceFingerprints || []).map((fp, i) => ({
+              sourceFP: fp, targetColName: payload.targetHeaders[i] || '', targetColIdx: i,
+              confidence: 80, status: 'matched', conflict: false,
+              candidates: [{ colName: payload.targetHeaders[i] || '', colIdx: i, score: 80, used: false }],
+            })),
+            conflicts: [], unmatchedTarget: [], overallConfidence: 80,
+            structuralSimilarity: 70, fieldOrderWarning: false, lowConfidenceWarning: false,
+          };
+          break;
+        case 'executeRules':
+          response = { id, success: true, headers: payload.headers, rows: payload.rows, logs: [] };
+          break;
+        case 'executeRecipeStep':
+          response = {
+            id, success: true, headers: payload.headers, rows: payload.rows,
+            affectedCount: 1, changes: [], profileAfter: mockProfile(payload.headers.length),
+          };
+          break;
+        default:
+          response = { id, success: false, error: 'Unknown task' };
+      }
+      if (this.onmessage) this.onmessage({ data: response });
+    }
+
+    flush() {
+      this._paused = false;
+      const q = this._queue.splice(0);
+      for (const { task, id, payload } of q) this._respond(task, id, payload);
+    }
+
+    pause() { this._paused = true; }
+    resume() { this.flush(); }
+    terminate() {}
+  }
+
+  // Replace global Worker with MockWorker BEFORE loading app scripts
+  window._OriginalWorker = window.Worker;
+  window.Worker = MockWorker;
+  </script>
+
+  <!-- Load actual source files (Worker is now mocked) -->
+  <script src="js/utils.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/worker-bridge.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/rules-panel.js"></script>
+  <script src="js/recipe-panel.js"></script>
+  <script src="js/recipe-replay.js"></script>
+  <script src="js/results.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+  // ============================================================
+  // Wait for app boot, then run tests
+  // ============================================================
+  (async function runAllTests() {
+    // Wait for the App IIFE to finish (store.open + new App)
+    await delay(200);
+
+    const app = window.app;
+    if (!app) {
+      log('FATAL: App failed to initialize', 'test fail');
+      showSummary();
+      return;
+    }
+
+    // Helper: inject a dataset directly into the app
+    function injectDataset(name, headers, rows) {
+      const profile = mockProfile(headers.length);
+      profile.profiles = headers.map((h, i) => ({
+        ...profile.profiles[0], column: h,
+      }));
+      app.datasets.set(name, {
+        name, fileName: name + '.csv',
+        headers: headers.slice(), rows: rows.map(r => r.slice()),
+        profile, originalHeaders: headers.slice(),
+        originalRows: rows.map(r => r.slice()),
+        parseErrors: [], history: [], historyIdx: -1,
+      });
+    }
+
+    // Helper: create a mock recipe
+    function createMockRecipe(id, name, headers) {
+      return {
+        id, name, version: 1,
+        createdAt: Date.now(), updatedAt: Date.now(),
+        sourceInfo: {
+          headers: headers.slice(),
+          fingerprints: mockFingerprints(headers),
+          rowCount: 100, columnCount: headers.length, qualityScore: 75,
+        },
+        steps: [
+          { index: 0, ruleType: 'trim', name: 'trim', enabled: true, config: { type: 'trim' }, columnRefs: [], executionStats: {} },
+          { index: 1, ruleType: 'trim', name: 'trim2', enabled: true, config: { type: 'trim' }, columnRefs: [], executionStats: {} },
+          { index: 2, ruleType: 'trim', name: 'trim3', enabled: true, config: { type: 'trim' }, columnRefs: [], executionStats: {} },
+        ],
+      };
+    }
+
+    // ============================================================
+    // TEST 1: sendForDataset rejects when dataset changes
+    // ============================================================
+    log('');
+    log('--- Test 1: sendForDataset STALE_DATASET rejection ---', 'info');
+    {
+      app.activeDatasetName = 'datasetA';
+
+      // Send a task for datasetA via the bridge
+      const mockWorker = app.worker.worker;
+      mockWorker._delay = 50; // add delay so we can switch before response
+
+      const promise = app.worker.sendForDataset('profile', { headers: ['a'], rows: [] }, 'datasetA');
+
+      // Switch dataset before response arrives
+      app.activeDatasetName = 'datasetB';
+
+      let error = null;
+      try { await promise; } catch (e) { error = e; }
+
+      assert(error !== null, 'sendForDataset should reject when dataset changes');
+      assert(error && error.message === 'STALE_DATASET', 'Error should be STALE_DATASET, got: ' + (error && error.message));
+
+      mockWorker._delay = 5; // reset delay
+    }
+
+    // ============================================================
+    // TEST 2: sendForDataset accepts when dataset stays the same
+    // ============================================================
+    log('');
+    log('--- Test 2: sendForDataset accepts for current dataset ---', 'info');
+    {
+      app.activeDatasetName = 'datasetA';
+      const mockWorker = app.worker.worker;
+      mockWorker._delay = 5;
+
+      let error = null;
+      let result = null;
+      try {
+        result = await app.worker.sendForDataset('profile', { headers: ['a'], rows: [] }, 'datasetA');
+      } catch (e) { error = e; }
+
+      assert(error === null, 'sendForDataset should resolve for current dataset');
+      assert(result && result.success, 'Result should have success=true');
+    }
+
+    // ============================================================
+    // TEST 3: Fast file switch during fingerprint computation
+    // ============================================================
+    log('');
+    log('--- Test 3: Fast file switch during computeFingerprints ---', 'info');
+    {
+      // Setup
+      injectDataset('fileA', ['name', 'age'], [['Alice', '30']]);
+      injectDataset('fileB', ['product', 'price'], [['Widget', '9.99']]);
+      app.activeDatasetName = 'fileA';
+
+      const mockWorker = app.worker.worker;
+      mockWorker._delay = 80; // slow response
+
+      const fpPromise = app.worker.computeFingerprints(
+        ['name', 'age'], [['Alice', '30']], mockProfile(2), 'fileA'
+      );
+
+      // Quick-switch to fileB
+      await delay(10);
+      app.activeDatasetName = 'fileB';
+
+      let error = null;
+      try { await fpPromise; } catch (e) { error = e; }
+
+      assert(error !== null, 'computeFingerprints should reject on file switch');
+      assert(
+        error && (error.message === 'STALE_DATASET' || error.message === 'STALE_TASK'),
+        'Error type should be STALE_DATASET or STALE_TASK, got: ' + (error && error.message)
+      );
+
+      mockWorker._delay = 5;
+    }
+
+    // ============================================================
+    // TEST 4: Dataset switch auto-closes recipe modal
+    // ============================================================
+    log('');
+    log('--- Test 4: Dataset switch auto-closes recipe panel modal ---', 'info');
+    {
+      injectDataset('dsA', ['a', 'b'], [['1', '2']]);
+      injectDataset('dsB', ['x', 'y'], [['3', '4']]);
+      app.activeDatasetName = 'dsA';
+
+      // Simulate opening a recipe modal
+      const panel = app.recipePanel;
+      panel._boundDatasetName = 'dsA';
+      panel._pendingRecipe = { name: 'test', steps: [] };
+      panel._pendingMappings = { mappings: [] };
+      panel.modal.style.display = 'flex';
+
+      // Trigger dataset change notification
+      const oldName = app.activeDatasetName;
+      app.activeDatasetName = 'dsB';
+      app._notifyDatasetChanged(oldName, 'dsB');
+
+      assert(panel.modal.style.display === 'none', 'Modal should be auto-closed on dataset switch');
+      assert(panel._pendingRecipe === null, '_pendingRecipe should be null after switch');
+      assert(panel._pendingMappings === null, '_pendingMappings should be null after switch');
+      assert(panel._boundDatasetName === null, '_boundDatasetName should be null after switch');
+    }
+
+    // ============================================================
+    // TEST 5: RecipeReplayEngine auto-cancels on dataset switch
+    // ============================================================
+    log('');
+    log('--- Test 5: Replay engine auto-cancels on dataset switch ---', 'info');
+    {
+      injectDataset('replayA', ['a', 'b'], [['1', '2']]);
+      injectDataset('replayB', ['x', 'y'], [['3', '4']]);
+      app.activeDatasetName = 'replayA';
+
+      const recipe = createMockRecipe('r1', 'testRecipe', ['a', 'b']);
+      const columnMap = new Map([['a', 'a'], ['b', 'b']]);
+
+      app.recipeReplay.prepare(recipe, columnMap, true, false);
+
+      assert(app.recipeReplay._boundDatasetName === 'replayA', 'Replay engine should bind to replayA');
+      assert(app.recipeReplay.state === 'ready', 'State should be ready after prepare');
+
+      // Switch dataset
+      app.activeDatasetName = 'replayB';
+      app._notifyDatasetChanged('replayA', 'replayB');
+
+      assert(app.recipeReplay.state === 'idle', 'State should be idle after dataset switch');
+      assert(app.recipeReplay._boundDatasetName === null, '_boundDatasetName should be null after cancel');
+
+      // Verify _executeStep rejects with cancelled
+      app.recipeReplay._boundDatasetName = null;
+      const stepResult = await app.recipeReplay._executeStep(0);
+      assert(stepResult.status === 'cancelled', '_executeStep should return cancelled when no bound dataset');
+    }
+
+    // ============================================================
+    // TEST 6: Recipe JSON import/export round-trip + schema version
+    // ============================================================
+    log('');
+    log('--- Test 6: Recipe JSON import/export & schema validation ---', 'info');
+    {
+      // Save a recipe via store
+      const recipe = createMockRecipe('rt_test', 'RoundTripTest', ['col1', 'col2']);
+      await store.saveRecipe(recipe);
+
+      // Verify schemaVersion was stamped
+      const saved = await store.getRecipe('rt_test');
+      assert(saved !== null, 'Saved recipe should be retrievable');
+      assert(saved && saved.schemaVersion === RECIPE_SCHEMA_VERSION, 'schemaVersion should be ' + RECIPE_SCHEMA_VERSION);
+
+      // Export
+      const exported = JSON.stringify({ version: 1, type: 'recipe', recipe: saved }, null, 2);
+      const parsed = JSON.parse(exported);
+      assert(parsed.recipe.schemaVersion === RECIPE_SCHEMA_VERSION, 'Exported recipe preserves schemaVersion');
+      assert(parsed.recipe.steps.length === 3, 'Exported recipe has 3 steps');
+      assert(parsed.recipe.sourceInfo.fingerprints.length === 2, 'Exported recipe has 2 fingerprints');
+
+      // Re-import
+      const reimported = parsed.recipe;
+      reimported.id = 'rt_reimported';
+      await store.saveRecipe(reimported);
+      const loaded = await store.getRecipe('rt_reimported');
+      assert(loaded !== null, 'Re-imported recipe should be retrievable');
+      assert(loaded && loaded.name === 'RoundTripTest', 'Name preserved after round-trip');
+
+      // Validate rejects invalid recipes
+      const invalid1 = { id: 'bad1' }; // missing name, steps, sourceInfo
+      assert(!store._validateRecipe(invalid1), 'Reject recipe missing required fields');
+
+      const invalid2 = { id: 'bad2', name: 'x', steps: [], sourceInfo: {}, schemaVersion: 999 };
+      assert(!store._validateRecipe(invalid2), 'Reject recipe with future schemaVersion');
+
+      // Cleanup
+      await store.deleteRecipe('rt_test');
+      await store.deleteRecipe('rt_reimported');
+    }
+
+    // ============================================================
+    // TEST 7: Expired recipe cleanup
+    // ============================================================
+    log('');
+    log('--- Test 7: Expired recipe filtering and cleanup ---', 'info');
+    {
+      // Save a valid recipe
+      const valid = createMockRecipe('exp_valid', 'ValidRecipe', ['a']);
+      await store.saveRecipe(valid);
+
+      // Save an expired recipe
+      const expired = createMockRecipe('exp_expired', 'ExpiredRecipe', ['a']);
+      expired.expiresAt = Date.now() - 10000; // expired 10 seconds ago
+      await store.saveRecipe(expired);
+
+      // Save a future-expiry recipe (should still be valid)
+      const future = createMockRecipe('exp_future', 'FutureRecipe', ['a']);
+      future.expiresAt = Date.now() + 3600000; // expires in 1 hour
+      await store.saveRecipe(future);
+
+      // listRecipes should filter out expired
+      const list = await store.listRecipes();
+      const names = list.map(r => r.name);
+      assert(names.includes('ValidRecipe'), 'Valid recipe should appear in list');
+      assert(!names.includes('ExpiredRecipe'), 'Expired recipe should NOT appear in list');
+      assert(names.includes('FutureRecipe'), 'Future-expiry recipe should appear in list');
+
+      // getRecipe for expired should return null
+      const got = await store.getRecipe('exp_expired');
+      assert(got === null, 'getRecipe for expired recipe should return null');
+
+      // cleanExpiredRecipes
+      await store.cleanExpiredRecipes();
+      // After cleanup, memory store should not have expired recipe
+      assert(!store._recipeMemoryStore.has('exp_expired'), 'Expired recipe removed from memory after cleanup');
+
+      // Cleanup
+      await store.deleteRecipe('exp_valid');
+      await store.deleteRecipe('exp_future');
+    }
+
+    // ============================================================
+    // TEST 8: Undo/redo history dataset isolation
+    // ============================================================
+    log('');
+    log('--- Test 8: Undo/redo history dataset isolation ---', 'info');
+    {
+      // Clear any leftover state
+      app.datasets.clear();
+
+      injectDataset('undoA', ['name', 'age'], [['Alice', '30'], ['Bob', '25']]);
+      injectDataset('undoB', ['product', 'price'], [['Widget', '9.99']]);
+
+      // Push history on undoA
+      app.activeDatasetName = 'undoA';
+      app._pushHistory();
+
+      const dsA = app.getDataset('undoA');
+      assert(dsA.history.length === 1, 'undoA should have 1 history entry');
+      assert(dsA.history[0].datasetName === 'undoA', 'History snapshot should have datasetName = undoA');
+      assert(typeof dsA.history[0].datasetFingerprint === 'number', 'History snapshot should have datasetFingerprint');
+
+      // Modify data and push again
+      dsA.headers = ['name', 'age', 'email'];
+      dsA.rows = [['Alice', '30', 'a@b.com']];
+      dsA.profile = mockProfile(3);
+      app._pushHistory();
+      assert(dsA.history.length === 2, 'undoA should have 2 history entries');
+
+      // Switch to undoB and push history
+      app.activeDatasetName = 'undoB';
+      app._pushHistory();
+      const dsB = app.getDataset('undoB');
+      assert(dsB.history.length === 1, 'undoB should have 1 history entry');
+      assert(dsB.history[0].datasetName === 'undoB', 'undoB history should have datasetName = undoB');
+
+      // Undo on undoB should work
+      app.undo(); // historyIdx = 0, no earlier entry, nothing happens
+      assert(dsB.historyIdx === 0, 'undoB historyIdx stays at 0 (no earlier)');
+
+      // Switch back to undoA and undo
+      app.activeDatasetName = 'undoA';
+      app.undo(); // should go from idx=1 to idx=0
+      assert(dsA.historyIdx === 0, 'undoA historyIdx should be 0 after undo');
+      assert(dsA.headers.length === 2, 'undoA headers should be restored to 2 columns');
+
+      // Redo
+      app.redo(); // should go from idx=0 to idx=1
+      assert(dsA.historyIdx === 1, 'undoA historyIdx should be 1 after redo');
+      assert(dsA.headers.length === 3, 'undoA headers should be restored to 3 columns after redo');
+
+      // Verify cross-dataset history snapshot check
+      // Manually corrupt a snapshot by setting wrong datasetName
+      dsA.history[0].datasetName = 'WRONG_DATASET';
+      dsA.historyIdx = 1;
+      app.undo(); // attempts to restore idx=0 which has wrong datasetName
+      // Should NOT restore because datasetName mismatch
+      assert(dsA.headers.length === 3, 'Should not restore history with mismatched datasetName');
+    }
+
+    // ============================================================
+    // TEST 9: WorkerBridge startNewTaskVersion rejects stale tasks
+    // ============================================================
+    log('');
+    log('--- Test 9: startNewTaskVersion rejects stale versioned tasks ---', 'info');
+    {
+      app.activeDatasetName = 'testDS';
+      const mockWorker = app.worker.worker;
+      mockWorker._delay = 100;
+
+      // Send a versioned task
+      const p = app.worker.send('profile', { headers: ['a'], rows: [] });
+
+      // Start new version before response
+      app.worker.startNewTaskVersion();
+
+      let error = null;
+      try { await p; } catch (e) { error = e; }
+
+      assert(error !== null, 'Stale versioned task should be rejected');
+      assert(error && error.message === 'STALE_TASK', 'Error should be STALE_TASK');
+
+      mockWorker._delay = 5;
+    }
+
+    // ============================================================
+    // TEST 10: Field order warning and structural similarity
+    // ============================================================
+    log('');
+    log('--- Test 10: Fingerprint confidence warnings (worker.js) ---', 'info');
+    {
+      // We can't run the real worker in tests, but we can verify the
+      // WorkerBridge method signatures accept the new datasetName param
+      const bridge = app.worker;
+
+      // Verify computeFingerprints accepts 4 params
+      assert(bridge.computeFingerprints.length === 4, 'computeFingerprints should accept 4 params (headers, rows, profile, datasetName)');
+
+      // Verify matchFingerprints accepts 5 params
+      assert(bridge.matchFingerprints.length === 5, 'matchFingerprints should accept 5 params');
+
+      // Verify sendForDataset exists
+      assert(typeof bridge.sendForDataset === 'function', 'sendForDataset method should exist');
+
+      // Verify setDatasetValidator exists
+      assert(typeof bridge.setDatasetValidator === 'function', 'setDatasetValidator method should exist');
+
+      // Verify the mock response includes new fields
+      app.activeDatasetName = 'testDS';
+      const result = await bridge.matchFingerprints(
+        mockFingerprints(['a', 'b']), ['x', 'y'], [['1', '2']], mockProfile(2), 'testDS'
+      );
+      assert('structuralSimilarity' in result, 'matchFingerprints response should include structuralSimilarity');
+      assert('fieldOrderWarning' in result, 'matchFingerprints response should include fieldOrderWarning');
+      assert('lowConfidenceWarning' in result, 'matchFingerprints response should include lowConfidenceWarning');
+    }
+
+    // ============================================================
+    // TEST 11: _validateRecipe edge cases
+    // ============================================================
+    log('');
+    log('--- Test 11: Store._validateRecipe edge cases ---', 'info');
+    {
+      // null/undefined
+      assert(!store._validateRecipe(null), 'null recipe is invalid');
+      assert(!store._validateRecipe(undefined), 'undefined recipe is invalid');
+
+      // missing fields
+      assert(!store._validateRecipe({ id: '1', name: 'x' }), 'Missing steps and sourceInfo');
+      assert(!store._validateRecipe({ id: '1', name: 'x', steps: 'not_array', sourceInfo: {} }), 'steps not array');
+
+      // valid recipe
+      const good = { id: '1', name: 'x', steps: [], sourceInfo: {}, schemaVersion: 1 };
+      assert(store._validateRecipe(good), 'Valid recipe passes');
+
+      // expired
+      const exp = { ...good, expiresAt: Date.now() - 1000 };
+      assert(!store._validateRecipe(exp), 'Expired recipe is invalid');
+
+      // future expiry
+      const fut = { ...good, expiresAt: Date.now() + 99999 };
+      assert(store._validateRecipe(fut), 'Future-expiry recipe is valid');
+
+      // schema too new
+      const futureSchema = { ...good, schemaVersion: 999 };
+      assert(!store._validateRecipe(futureSchema), 'Future schema version is invalid');
+
+      // no schema version (old recipe) — should still be valid
+      const noSchema = { id: '1', name: 'x', steps: [], sourceInfo: {} };
+      assert(store._validateRecipe(noSchema), 'Recipe without schemaVersion is still valid');
+    }
+
+    // ============================================================
+    // Done
+    // ============================================================
+    showSummary();
+  })();
+  </script>
+</body>
+</html>

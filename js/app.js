@@ -7,6 +7,7 @@ class App {
     this.activeDatasetName = null;
 
     this.worker = new WorkerBridge('worker.js');
+    this.worker.setDatasetValidator((name) => name === this.activeDatasetName);
     this.grid = new DataGrid(document.getElementById('dataView'));
     this.rulesPanel = new RulesPanel(this);
     this.resultsView = new ResultsView(this);
@@ -159,7 +160,11 @@ class App {
     hideLoading();
 
     if (!this.activeDatasetName || !this.datasets.has(this.activeDatasetName)) {
+      const oldName = this.activeDatasetName;
       this.activeDatasetName = this.datasets.keys().next().value;
+      if (oldName !== this.activeDatasetName) {
+        this._notifyDatasetChanged(oldName, this.activeDatasetName);
+      }
     }
 
     this._renderDatasetList();
@@ -190,7 +195,9 @@ class App {
     }
     this.datasets.delete(name);
     if (this.activeDatasetName === name) {
+      const oldName = this.activeDatasetName;
       this.activeDatasetName = this.datasets.size > 0 ? this.datasets.keys().next().value : null;
+      this._notifyDatasetChanged(oldName, this.activeDatasetName);
     }
     this._renderDatasetList();
     if (this.activeDatasetName) {
@@ -224,7 +231,12 @@ class App {
       }
       const item = e.target.closest('.dataset-item');
       if (item) {
-        this.activeDatasetName = item.dataset.name;
+        const oldName = this.activeDatasetName;
+        const newName = item.dataset.name;
+        this.activeDatasetName = newName;
+        if (oldName !== newName) {
+          this._notifyDatasetChanged(oldName, newName);
+        }
         this._renderDatasetList();
         this._renderActiveDataset();
         // Don't push history on dataset switch — just update button state
@@ -257,6 +269,18 @@ class App {
     document.getElementById('btnExportCSV').disabled = false;
     document.getElementById('btnExportReport').disabled = false;
     this._updateUndoRedoButtons();
+  }
+
+  /* ============================================================
+     Dataset Change Notification
+     ============================================================ */
+  _notifyDatasetChanged(oldName, newName) {
+    if (this.recipePanel && typeof this.recipePanel.onDatasetChanged === 'function') {
+      this.recipePanel.onDatasetChanged(oldName, newName);
+    }
+    if (this.recipeReplay && typeof this.recipeReplay.onDatasetChanged === 'function') {
+      this.recipeReplay.onDatasetChanged(oldName, newName);
+    }
   }
 
   /* ============================================================
@@ -425,6 +449,17 @@ class App {
   /* ============================================================
      Undo / Redo (per-dataset history stacks)
      ============================================================ */
+  _computeHeaderFingerprint(headers) {
+    const joined = headers.join('\x00');
+    let hash = 0;
+    for (let i = 0; i < joined.length; i++) {
+      const ch = joined.charCodeAt(i);
+      hash = ((hash << 5) - hash) + ch;
+      hash |= 0;
+    }
+    return hash;
+  }
+
   _pushHistory() {
     const ds = this.getActiveDataset();
     if (!ds) return;
@@ -443,6 +478,8 @@ class App {
       rows: ds.rows.map(r => r.slice()),
       profile: deepClone(ds.profile),
       rulesSnapshot: deepClone(this.rulesPanel.getRules()),
+      datasetName: this.activeDatasetName,
+      datasetFingerprint: this._computeHeaderFingerprint(ds.headers),
     });
 
     if (ds.history.length > this.maxHistory) ds.history.shift();
@@ -469,6 +506,12 @@ class App {
     if (!ds || !ds.history) return;
     const snap = ds.history[ds.historyIdx];
     if (!snap) return;
+
+    // Strict dataset identity check
+    if (snap.datasetName && snap.datasetName !== this.activeDatasetName) {
+      toast('历史记录与当前数据集不匹配，已跳过', 'warning');
+      return;
+    }
 
     // Restore into the CURRENT dataset only — never switch datasets
     ds.headers = snap.headers.slice();
@@ -567,6 +610,8 @@ class App {
     const ds = this.getActiveDataset();
     if (!ds) { toast('请先导入数据', 'warning'); return null; }
 
+    const boundDatasetName = this.activeDatasetName;
+
     const rules = this.rulesPanel.getRules().filter(r => r.enabled !== false);
     if (rules.length === 0) { toast('请先添加清洗规则', 'warning'); return null; }
 
@@ -575,8 +620,16 @@ class App {
       const fpResult = await this.worker.computeFingerprints(
         ds.originalHeaders || ds.headers,
         ds.originalRows || ds.rows,
-        ds.profile
+        ds.profile,
+        boundDatasetName
       );
+
+      // Verify dataset hasn't changed while computing fingerprints
+      if (this.activeDatasetName !== boundDatasetName) {
+        hideLoading();
+        toast('数据集已切换，操作已取消', 'warning');
+        return null;
+      }
 
       const fingerprints = fpResult.fingerprints;
 
@@ -614,6 +667,10 @@ class App {
       return recipe;
     } catch (err) {
       hideLoading();
+      if (err.message === 'STALE_TASK' || err.message === 'STALE_DATASET' || err.message === 'CANCELLED') {
+        toast('数据集已切换，操作已取消', 'warning');
+        return null;
+      }
       toast('生成方案失败: ' + err.message, 'error');
       return null;
     }

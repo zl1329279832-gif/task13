@@ -10,6 +10,7 @@ class RecipeReplayEngine {
     this.stepResults = [];
     this._resumeResolve = null;
     this._cancelled = false;
+    this._boundDatasetName = null;
   }
 
   /**
@@ -24,6 +25,7 @@ class RecipeReplayEngine {
     this.stepResults = [];
     this.currentStepIdx = -1;
     this._cancelled = false;
+    this._boundDatasetName = this.app.activeDatasetName;
 
     this.resolvedSteps = recipe.steps.map((step, idx) => {
       const resolved = deepClone(step);
@@ -56,6 +58,20 @@ class RecipeReplayEngine {
     }
 
     this.state = 'ready';
+  }
+
+  _verifyDataset() {
+    if (!this._boundDatasetName) return false;
+    return this.app.activeDatasetName === this._boundDatasetName;
+  }
+
+  onDatasetChanged(oldName, newName) {
+    if (this._boundDatasetName && this._boundDatasetName !== newName) {
+      if (this.state === 'running' || this.state === 'paused' || this.state === 'ready') {
+        this.cancel();
+      }
+      this._boundDatasetName = null;
+    }
   }
 
   _resolveColumnRefs(config, columnRefs, colMap) {
@@ -102,9 +118,11 @@ class RecipeReplayEngine {
 
     for (let i = 0; i < this.resolvedSteps.length; i++) {
       if (this._cancelled) { this.state = 'idle'; return; }
+      if (!this._verifyDataset()) { this.state = 'idle'; return; }
       if (this.state === 'paused') {
         await this._waitForResume();
         if (this._cancelled) { this.state = 'idle'; return; }
+        if (!this._verifyDataset()) { this.state = 'idle'; return; }
       }
 
       this.currentStepIdx = i;
@@ -129,6 +147,11 @@ class RecipeReplayEngine {
    * @param {Function} onComplete - (stepIdx, result) => void
    */
   async executeNextStep(onComplete) {
+    if (!this._verifyDataset()) {
+      this.state = 'idle';
+      return null;
+    }
+
     const nextIdx = this.currentStepIdx + 1;
     if (nextIdx >= this.resolvedSteps.length) {
       this.state = 'complete';
@@ -158,6 +181,15 @@ class RecipeReplayEngine {
   }
 
   async _executeStep(stepIdx) {
+    if (!this._verifyDataset()) {
+      return {
+        index: stepIdx, status: 'cancelled',
+        error: 'Dataset changed during replay',
+        affectedCount: 0, changes: [],
+        qualityBefore: 0, qualityAfter: 0, qualityDelta: 0,
+      };
+    }
+
     const step = this.resolvedSteps[stepIdx];
     const ds = this.app.getActiveDataset();
     if (!ds) return { index: stepIdx, status: 'error', error: 'No active dataset' };
@@ -218,6 +250,7 @@ class RecipeReplayEngine {
   cancel() {
     this._cancelled = true;
     this.state = 'idle';
+    this._boundDatasetName = null;
     if (this._resumeResolve) { this._resumeResolve(); this._resumeResolve = null; }
   }
   _waitForResume() {

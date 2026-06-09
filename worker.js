@@ -1004,7 +1004,32 @@ function matchFingerprints(sourceFPs, targetHeaders, targetRows, targetProfile) 
   const matchedCount = mappings.filter(m => m.status === 'matched').length;
   const overallConfidence = n > 0 ? Math.round(matchedCount / n * 100) : 0;
 
-  return { mappings, conflicts, unmatchedTarget, overallConfidence };
+  // Structural similarity: header set Jaccard
+  const sourceNames = new Set(sourceFPs.map(fp => fp.originalName.toLowerCase()));
+  const targetNames = new Set(targetHeaders.map(h => h.toLowerCase()));
+  const headerUnion = new Set([...sourceNames, ...targetNames]);
+  let headerIntersection = 0;
+  for (const name of sourceNames) {
+    if (targetNames.has(name)) headerIntersection++;
+  }
+  const structuralSimilarity = headerUnion.size > 0
+    ? Math.round(headerIntersection / headerUnion.size * 100) : 0;
+
+  // Field order warning: matched columns with large positional shifts
+  const fieldOrderWarning = mappings.some(m =>
+    m.status === 'matched' && m.targetColIdx >= 0 &&
+    Math.abs(m.sourceFP.colIdx - m.targetColIdx) > 2
+  );
+
+  // Low confidence warning
+  const lowConfidenceWarning = overallConfidence < 50;
+
+  return {
+    mappings, conflicts, unmatchedTarget, overallConfidence,
+    structuralSimilarity,
+    fieldOrderWarning,
+    lowConfidenceWarning,
+  };
 }
 
 function computePairScore(src, tgt) {
@@ -1023,7 +1048,12 @@ function computePairScore(src, tgt) {
     wName = 0.50; wType = 0.20; wSample = 0.15; wStats = 0.15;
   }
 
-  return wName * nameScore + wType * typeScore + wSample * sampleScore + wStats * statsScore;
+  // Column order distance penalty — penalize large positional shifts
+  const orderDistance = Math.abs(src.colIdx - tgt.colIdx);
+  const maxIdx = Math.max(src.colIdx, tgt.colIdx, 1);
+  const orderPenalty = Math.min(0.05, (orderDistance / maxIdx) * 0.1);
+
+  return Math.max(0, wName * nameScore + wType * typeScore + wSample * sampleScore + wStats * statsScore - orderPenalty);
 }
 
 function computeNameScore(src, tgt) {

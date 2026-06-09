@@ -15,11 +15,24 @@ class RecipePanel {
     this._pendingRecipe = null;
     this._pendingMappings = null;
     this._columnMap = null;
+    this._boundDatasetName = null;
     this._currentStepMode = 'all'; // 'all' or 'step'
 
     this.modalCancel.addEventListener('click', () => this._hideModal());
     this.modalCloseBtn.addEventListener('click', () => this._hideModal());
     this.modalBackdrop.addEventListener('click', () => this._hideModal());
+  }
+
+  onDatasetChanged(oldName, newName) {
+    if (this._boundDatasetName && this._boundDatasetName !== newName) {
+      this._pendingRecipe = null;
+      this._pendingMappings = null;
+      this._boundDatasetName = null;
+      if (this.modal.style.display === 'flex') {
+        this._hideModal();
+        toast('数据集已切换，方案操作已取消', 'warning');
+      }
+    }
   }
 
   async render() {
@@ -103,19 +116,39 @@ class RecipePanel {
     const ds = this.app.getActiveDataset();
     if (!ds) { toast('请先导入目标 CSV 数据', 'warning'); return; }
 
+    const boundDatasetName = this.app.activeDatasetName;
+    this._boundDatasetName = boundDatasetName;
+
     const recipe = await store.getRecipe(id);
     if (!recipe) { toast('方案不存在', 'error'); return; }
+
+    if (this.app.activeDatasetName !== boundDatasetName) {
+      toast('数据集已切换，操作已取消', 'warning');
+      return;
+    }
 
     showLoading('正在分析列匹配...');
     try {
       const matchResult = await this.app.worker.matchFingerprints(
         recipe.sourceInfo.fingerprints,
-        ds.headers, ds.rows, ds.profile
+        ds.headers, ds.rows, ds.profile,
+        boundDatasetName
       );
+
+      if (this.app.activeDatasetName !== boundDatasetName) {
+        hideLoading();
+        toast('数据集已切换，操作已取消', 'warning');
+        return;
+      }
+
       hideLoading();
       this._showMatchModal(recipe, matchResult);
     } catch (err) {
       hideLoading();
+      if (err.message === 'STALE_TASK' || err.message === 'STALE_DATASET' || err.message === 'CANCELLED') {
+        toast('数据集已切换，操作已取消', 'warning');
+        return;
+      }
       toast('列匹配失败: ' + err.message, 'error');
     }
   }
@@ -307,6 +340,12 @@ class RecipePanel {
   }
 
   async _replayAll() {
+    if (this._boundDatasetName && this.app.activeDatasetName !== this._boundDatasetName) {
+      toast('数据集已切换，无法执行方案', 'warning');
+      this._hideModal();
+      return;
+    }
+
     const replay = this.app.recipeReplay;
     const ds = this.app.getActiveDataset();
     if (!ds) return;
@@ -338,6 +377,12 @@ class RecipePanel {
   }
 
   async _replayNextStep() {
+    if (this._boundDatasetName && this.app.activeDatasetName !== this._boundDatasetName) {
+      toast('数据集已切换，无法执行方案', 'warning');
+      this._hideModal();
+      return;
+    }
+
     const replay = this.app.recipeReplay;
     if (replay.state === 'idle' || replay.state === 'ready') {
       this.app._pushHistory();
@@ -512,5 +557,6 @@ class RecipePanel {
     this.modalCancel.textContent = '取消';
     this._pendingRecipe = null;
     this._pendingMappings = null;
+    this._boundDatasetName = null;
   }
 }

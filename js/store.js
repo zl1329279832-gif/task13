@@ -2,6 +2,7 @@
 
 const DB_NAME = 'CSVDataCleaner';
 const DB_VERSION = 3;
+const RECIPE_SCHEMA_VERSION = 1;
 
 class Store {
   constructor() {
@@ -195,6 +196,7 @@ class Store {
      Recipe CRUD
      ============================================================ */
   async saveRecipe(recipe) {
+    recipe.schemaVersion = RECIPE_SCHEMA_VERSION;
     if (!this.dbAvailable) {
       this._recipeMemoryStore.set(recipe.id, recipe);
       return;
@@ -222,14 +224,17 @@ class Store {
 
   async listRecipes() {
     if (!this.dbAvailable) {
-      return [...this._recipeMemoryStore.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      return [...this._recipeMemoryStore.values()]
+        .filter(r => this._validateRecipe(r))
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     }
     try {
       return await new Promise((resolve, reject) => {
         const tx = this._safeTransaction('recipes', 'readonly');
         const req = tx.objectStore('recipes').getAll();
         req.onsuccess = () => {
-          const results = req.result || [];
+          let results = req.result || [];
+          results = results.filter(r => this._validateRecipe(r));
           this._recipeMemoryStore.clear();
           for (const r of results) this._recipeMemoryStore.set(r.id, r);
           resolve(results.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
@@ -237,22 +242,33 @@ class Store {
         tx.onerror = () => reject(new Error('Failed to list recipes'));
       });
     } catch (err) {
-      return [...this._recipeMemoryStore.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      return [...this._recipeMemoryStore.values()]
+        .filter(r => this._validateRecipe(r))
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     }
   }
 
   async getRecipe(id) {
-    if (!this.dbAvailable) return this._recipeMemoryStore.get(id) || null;
-    try {
-      return await new Promise((resolve, reject) => {
-        const tx = this._safeTransaction('recipes', 'readonly');
-        const req = tx.objectStore('recipes').get(id);
-        req.onsuccess = () => resolve(req.result || null);
-        tx.onerror = () => reject(new Error('Failed to get recipe'));
-      });
-    } catch (err) {
-      return this._recipeMemoryStore.get(id) || null;
+    let recipe;
+    if (!this.dbAvailable) {
+      recipe = this._recipeMemoryStore.get(id) || null;
+    } else {
+      try {
+        recipe = await new Promise((resolve, reject) => {
+          const tx = this._safeTransaction('recipes', 'readonly');
+          const req = tx.objectStore('recipes').get(id);
+          req.onsuccess = () => resolve(req.result || null);
+          tx.onerror = () => reject(new Error('Failed to get recipe'));
+        });
+      } catch (err) {
+        recipe = this._recipeMemoryStore.get(id) || null;
+      }
     }
+    if (recipe && !this._validateRecipe(recipe)) {
+      console.warn('Invalid or expired recipe:', id);
+      return null;
+    }
+    return recipe;
   }
 
   async deleteRecipe(id) {
@@ -267,6 +283,43 @@ class Store {
       });
     } catch (err) {
       console.warn('IDB recipe delete failed:', err.message);
+    }
+  }
+
+  _validateRecipe(recipe) {
+    if (!recipe) return false;
+    if (!recipe.id || !recipe.name) return false;
+    if (!recipe.steps || !Array.isArray(recipe.steps)) return false;
+    if (!recipe.sourceInfo) return false;
+    if (recipe.expiresAt && Date.now() > recipe.expiresAt) return false;
+    if (recipe.schemaVersion && recipe.schemaVersion > RECIPE_SCHEMA_VERSION) return false;
+    return true;
+  }
+
+  async cleanExpiredRecipes() {
+    if (!this.dbAvailable) {
+      for (const [id, recipe] of this._recipeMemoryStore) {
+        if (!this._validateRecipe(recipe)) {
+          this._recipeMemoryStore.delete(id);
+        }
+      }
+      return;
+    }
+    try {
+      const validRecipes = await this.listRecipes();
+      const validIds = new Set(validRecipes.map(r => r.id));
+      const tx = this._safeTransaction('recipes', 'readwrite');
+      const objStore = tx.objectStore('recipes');
+      const allReq = objStore.getAll();
+      allReq.onsuccess = () => {
+        for (const r of allReq.result || []) {
+          if (!validIds.has(r.id)) {
+            objStore.delete(r.id);
+          }
+        }
+      };
+    } catch (err) {
+      console.warn('Failed to clean expired recipes:', err.message);
     }
   }
 }
